@@ -291,6 +291,7 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		if not self._renew_thread is None:	# If there was a lease currently obtained
 			self._renew_thread.cancel()
 			self._renew_thread = None
+		
 		dhcp_request = DhcpPacket()
 		dhcp_request.SetOption('op', [1])
 		dhcp_request.SetOption('htype', [1])
@@ -316,6 +317,9 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		self._request_sent = True
 		self.DhcpRenewSent()	# Emit DBUS signal
 		self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
+		self._renew_thread = threading.Timer(self._last_leasetime / 6, self.sendDhcpRenew, [])	# After the first renew is sent, increase the frequency of the next renew packets
+		self._renew_thread.start()
+
 	
 	def sendDhcpRelease(self, ciaddr = None):
 		"""
@@ -399,10 +403,10 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 			'SERVER ' + str(self._last_serverid),
 			'LEASETIME ' + str(self._last_leasetime))
 		print('Starting renew thread')
+		if not self._renew_thread is None: self._renew_thread.cancel()	# Cancel the release timeout
 		self._renew_thread = threading.Timer(self._last_leasetime / 2, self.sendDhcpRenew, [])
 		self._renew_thread.start()
-		if self._release_thread:
-			self._release_thread.cancel()	# Cancel the release timeout
+		if not self._release_thread is None: self._release_thread.cancel()	# Cancel the release timeout
 		self._release_thread = threading.Timer(self._last_leasetime, self.sendDhcpRelease, [])	# Restart the release timeout
 		self._release_thread.start()
 	

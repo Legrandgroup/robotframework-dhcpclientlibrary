@@ -38,6 +38,8 @@ DHCP_TYPES = ['UNKNOWN',
 DBUS_OBJECT_PATH = '/com/legrandelectric/RobotFrameworkIPC'	# The name of the D-Bus object under which we will communicate on D-Bus
 DBUS_SERVICE_PATH = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'	# The name of the D-Bus service under which we will perform input/output on D-Bus
 
+CLIENT_ID_HWTYPE_ETHER = 0x01
+
 def dhcpNameToType(name, exception_on_unknown = True):
 	"""
 	Find a DHCP type (integer), given its name (case insentive)
@@ -100,16 +102,23 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		self._listen_address = listen_address
 		self._client_port = client_port
 		self._server_port = server_port
+		
 		self._last_ipaddress = None
 		self._last_netmask = None
 		self._last_defaultgw = None
+		self._last_dnsip_list = [None]
+		
 		self._last_serverid = None
+		self._last_leasetime = None
 		self._lease_valid = False
 		self._request_sent = False
+		
+		self._parameter_list = None	# DHCP Parameter request list (options requested from the DHCP server)
+		
 		if mac_addr == None:
 			if self._ifname:
 				self._mac_addr = MacAddr.getHwAddrForIf(ifname = self._ifname)
-			elif self._listen_address != '0.0.0.' and self._listen_address != '::':
+			elif self._listen_address != '0.0.0.0' and self._listen_address != '::':
 				self._mac_addr = MacAddr.getHwAddrForIp(ip = self._listen_address)
 			else:
 				raise Exception('NoInterfaceProvided')
@@ -117,17 +126,21 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 	
 	# D-Bus-related methods
 	@dbus.service.signal(DBUS_SERVICE_PATH)
-	def HelloSignal(self, message):
-		# The signal is emitted when this method exits
-		# You can have code here if you wish
+	def DhcpDiscoverSent(self):
 		pass
-
-	@dbus.service.method(DBUS_SERVICE_PATH)
-	def emitHelloSignal(self):
-		#you emit signals by calling the signal's skeleton method
-		self.HelloSignal('Hello')
-		return 'Signal emitted'
-
+	
+	@dbus.service.signal(DBUS_SERVICE_PATH)
+	def DhcpOfferRecv(self, ip, server):
+		pass
+	
+	@dbus.service.signal(DBUS_SERVICE_PATH)
+	def DhcpRequestSent(self):
+		pass
+	
+	@dbus.service.signal(DBUS_SERVICE_PATH)
+	def DhcpAckRecv(self, ip, netmask, defaultgw, dns, server, leasetime):
+		pass
+	
 	@dbus.service.method(DBUS_SERVICE_PATH, in_signature='', out_signature='')
 	def Exit(self):
 		loop.quit()
@@ -166,7 +179,7 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		"""
 		return self._current_xid
 		
-	def sendDhcpDiscover(self):
+	def sendDhcpDiscover(self, parameter_list = None):
 		"""
 		Send a DHCP DISCOVER packet to the network
 		"""
@@ -180,13 +193,24 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_discover.SetOption('chaddr',hwmac(self._mac_addr).list() + [0] * 10)
 		dhcp_discover.SetOption('ciaddr',ipv4('0.0.0.0').list())
 		dhcp_discover.SetOption('siaddr',ipv4('0.0.0.0').list())
-		dhcp_discover.SetOption('dhcp_message_type',[dhcpNameToType('DISCOVER')])
-		#dhcp_discover.SetOption('parameter_request_list',1)
+		dhcp_discover.SetOption('dhcp_message_type', [dhcpNameToType('DISCOVER')])
+		dhcp_discover.SetOption('client_identifier', [CLIENT_ID_HWTYPE_ETHER] + hwmac(self._mac_addr).list())
+		if parameter_list == None:
+			parameter_list =[1,	# Subnet mask
+				3,	# Router
+				6,	# DNS
+				15,	# Domain
+				42,	# NTP servers
+				]
+		self._parameter_list = parameter_list
+		dhcp_discover.SetOption('parameter_request_list', self._parameter_list)
 		#client.dhcp_socket.settimeout(timeout)
 		dhcp_discover.SetOption('flags',[128, 0])
 		dhcp_discover_type = dhcp_discover.GetOption('dhcp_message_type')[0]
 		print("==>Sending DISCOVER")
+		self._lease_valid = False
 		self._request_sent = False
+		self.DhcpDiscoverSent()	# Emit DBUS signal
 		self.SendDhcpPacketTo(dhcp_discover, '255.255.255.255', self._server_port)
 	
 	def handleDhcpOffer(self, res):
@@ -197,7 +221,10 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_message_type = dhcp_offer.GetOption('dhcp_message_type')[0]
 		print("==>Received " + dhcpTypeToName(dhcp_message_type, False) + " with content:")
 		print(dhcp_offer.str())
-		self.sendDhcpRequest(ciaddr = ipv4(dhcp_offer.GetOption('yiaddr')), siaddr = ipv4(dhcp_offer.GetOption('server_identifier')))
+		proposed_ip = ipv4(dhcp_offer.GetOption('yiaddr'))
+		server_id = ipv4(dhcp_offer.GetOption('server_identifier'))
+		self.DhcpOfferRecv('IP ' + str(proposed_ip), 'SERVER ' + str(server_id))	# Emit DBUS signal with proposed IP address
+		self.sendDhcpRequest(requested_ip = ipv4(dhcp_offer.GetOption('yiaddr')), server_id = server_id)
 	
 	def HandleDhcpOffer(self, res):
 		"""
@@ -205,7 +232,7 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		"""
 		self.handleDhcpOffer(res)
 	
-	def sendDhcpRequest(self, ciaddr = '0.0.0.0', siaddr = '0.0.0.0', dstipaddr = '255.255.255.255'):
+	def sendDhcpRequest(self, requested_ip = '0.0.0.0', server_id = '0.0.0.0', dstipaddr = '255.255.255.255'):
 		"""
 		Send a DHCP REQUEST packet to the network
 		"""
@@ -217,18 +244,23 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_request.SetOption('xid', self._getXitAsDhcpOption())
 		dhcp_request.SetOption('giaddr', ipv4('0.0.0.0').list())
 		dhcp_request.SetOption('chaddr', hwmac(self._mac_addr).list() + [0] * 10)
-		if isinstance(ciaddr, basestring):	# In python 3, this would be isinstance(x, str)
-			ciaddr = ipv4(ciaddr)
-		dhcp_request.SetOption('ciaddr', ciaddr.list())
-		if isinstance(siaddr, basestring):
-			siaddr = ipv4(siaddr)
-		dhcp_request.SetOption('siaddr', siaddr.list())
+		dhcp_request.SetOption('ciaddr', ipv4('0.0.0.0').list())
+		dhcp_request.SetOption('siaddr', ipv4('0.0.0.0').list())
+		if isinstance(requested_ip, basestring):	# In python 3, this would be isinstance(x, str)
+			requested_ip = ipv4(requested_ip)
+		if isinstance(server_id, basestring):
+			server_id = ipv4(server_id)
 		dhcp_request.SetOption('dhcp_message_type', [dhcpNameToType('REQUEST')])
-		#	dhcp_request.SetOption('parameter_request_list',1)
+		dhcp_request.SetOption('client_identifier', [CLIENT_ID_HWTYPE_ETHER] + hwmac(self._mac_addr).list())
+		dhcp_request.SetOption('request_ip_address', requested_ip.list())
+		dhcp_request.SetOption('server_identifier', server_id.list())
+		if self._parameter_list != None:
+			dhcp_request.SetOption('parameter_request_list', self._parameter_list)	# Resend the same parameter list as for DISCOVER
 		#self.dhcp_socket.settimeout(timeout)
 		dhcp_request.SetOption('flags', [128, 0])
 		dhcp_request_type = dhcp_request.GetOption('dhcp_message_type')[0]
 		print("==>Sending REQUEST")
+		self.DhcpRequestSent()	# Emit DBUS signal
 		self._request_sent = True
 		self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
 		
@@ -260,20 +292,42 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
 	
 	def handleDhcpAck(self, packet):
+		"""
+		Handle a DHCP ACK packet coming from the network
+		"""
 		print("==>Received ACK with content:")
 		print(packet.str())
+		#self.HelloSignal('<-ACK')
 		if self._request_sent:
-			print("DHCP server acknowledged our IP")
 			self._request_sent = False
-		self._lease_valid = True
-		self._last_serverid = ipv4(packet.GetOption('server_identifier'))
+		else:
+			print("Received an ACK without having sent a REQUEST")
+			raise Exception('UnexpectedAck')
+		
 		self._last_ipaddress = ipv4(packet.GetOption('yiaddr'))
 		self._last_netmask = ipv4(packet.GetOption('subnet_mask'))
-		self._last_defaultgw = ipv4(packet.GetOption('router'))
-		print("We've been given IP: " + str(packet.GetOption('yiaddr')))
-		print("We've been given netmask: " + str(packet.GetOption('subnet_mask')))
-		print("We've been given gw: " + str(packet.GetOption('router')))# Router is of type ipv4+ so we could get more than one router IPv4 address... only consider the first one here
+		self._last_defaultgw = ipv4(packet.GetOption('router'))	# router is of type ipv4+ so we could get more than one router IPv4 address... but we only pick up the first one here
 		
+		self._last_dnsip_list = []
+		dnsip_array = packet.GetOption('domain_name_server')	# DNS is of type ipv4+ so we could get more than one router IPv4 address... handle all DNS entries in a list
+		for i in range(0, len(dnsip_array), 4):
+			if len(dnsip_array[i:i+4]) == 4:
+				self._last_dnsip_list += [ipv4(dnsip_array[i:i+4])]
+		
+		self._last_serverid = ipv4(packet.GetOption('server_identifier'))
+		self._last_leasetime = str(ipv4(packet.GetOption('ip_address_lease_time')).int())
+		
+		self._lease_valid = True
+		
+		dns_space_sep = ' '.join(map(str, self._last_dnsip_list))
+		
+		self.DhcpAckRecv('IP ' + str(self._last_ipaddress),
+			'NETMASK ' + str(self._last_netmask),
+			'DEFAULTGW ' + str(self._last_defaultgw),
+			'DNS ' + dns_space_sep,
+			'SERVER ' + str(self._last_serverid),
+			'LEASETIME ' + str(self._last_leasetime))
+	
 	def HandleDhcpAck(self, packet):
 		"""
 		Inherited DhcpClient has virtual methods written with an initial capital, so wrap around it to use our method naming convention
@@ -281,8 +335,25 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		self.handleDhcpAck(packet)
 	
 	def handleDhcpNack(self, packet):
-		print("Recevied NACK")
+		"""
+		Handle a DHCP NACK packet coming from the network
+		Today, this will raise an exception. No processing will be done on such packets
+		"""
+		
+		self._last_ipaddress = None
+		self._last_netmask = None
+		self._last_defaultgw = None
+		self._last_dnsip_list = []
+		
+		self._last_serverid = None
+		self._last_leasetime = None
+		self._lease_valid = False
+		
+		self._request_sent = False
+		
+		print("==>Received NACK:")
 		print(packet.str())
+		raise Exception('DhcpNack')
 	
 	def HandleDhcpNack(self, packet):
 		"""
@@ -304,7 +375,7 @@ while True :
 	next_packet = client.GetNextDhcpPacket()
 	if next_packet != None:
 		packet_as_str=client.GetNextDhcpPacket().str()
-		client.HelloSignal(packet_as_str)
+		#client.HelloSignal(packet_as_str)
 		#print(packet_as_str)
 	else:
 		print('Waiting...')

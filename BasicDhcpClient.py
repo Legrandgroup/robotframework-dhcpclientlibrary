@@ -115,6 +115,8 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		
 		self._parameter_list = None	# DHCP Parameter request list (options requested from the DHCP server)
 		
+		self._renew_thread = None
+		
 		if mac_addr == None:
 			if self._ifname:
 				self._mac_addr = MacAddr.getHwAddrForIf(ifname = self._ifname)
@@ -138,12 +140,25 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		pass
 	
 	@dbus.service.signal(DBUS_SERVICE_PATH)
+	def DhcpRenewSent(self):
+		pass
+	
+	@dbus.service.signal(DBUS_SERVICE_PATH)
 	def DhcpAckRecv(self, ip, netmask, defaultgw, dns, server, leasetime):
 		pass
 	
 	@dbus.service.method(DBUS_SERVICE_PATH, in_signature='', out_signature='')
 	def Exit(self):
-		loop.quit()
+		pass
+		#loop.quit()	# When we will have a D-Bus main loop
+		
+	def exit(self):
+		"""
+		Cleanup object and stop all threads
+		"""
+		if self._renew_thread != None:
+			self._renew_thread.cancel()
+		self.Exit()	# Inherited dbus.service.Ibject has virtual methods written with an initial capital, so wrap around it to use our method naming convention
 	
 	# DHCP-related methods
 	def genNewXid(self):
@@ -269,6 +284,7 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		Send a DHCP REQUEST to renew the current lease
 		This is almost the same as the REQUEST following a DISCOVER, but we provide our client IP address here
 		"""
+		print("Renewing lease")
 		dhcp_request = DhcpPacket()
 		dhcp_request.SetOption('op', [1])
 		dhcp_request.SetOption('htype', [1])
@@ -283,12 +299,16 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 			else:
 				raise Exception('RenewOnInvalidLease')
 		dhcp_request.SetOption('ciaddr', ciaddr.list())
-		dhcp_request.SetOption('siaddr', siaddr.list())
+		dhcp_request.SetOption('siaddr', ipv4('0.0.0.0').list())
 		dhcp_request.SetOption('dhcp_message_type', [dhcpNameToType('REQUEST')])
+		dhcp_request.SetOption('client_identifier', [CLIENT_ID_HWTYPE_ETHER] + hwmac(self._mac_addr).list())
+		if self._parameter_list != None:
+			dhcp_request.SetOption('parameter_request_list', self._parameter_list)	# Resend the same parameter list as for DISCOVER
 		dhcp_request.SetOption('flags', [128, 0])
 		dhcp_request_type = dhcp_request.GetOption('dhcp_message_type')[0]
 		print("==>Sending REQUEST (renewing lease)")
 		self._request_sent = True
+		self.DhcpRenewSent()	# Emit DBUS signal
 		self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
 	
 	def handleDhcpAck(self, packet):
@@ -315,7 +335,7 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 				self._last_dnsip_list += [ipv4(dnsip_array[i:i+4])]
 		
 		self._last_serverid = ipv4(packet.GetOption('server_identifier'))
-		self._last_leasetime = str(ipv4(packet.GetOption('ip_address_lease_time')).int())
+		self._last_leasetime = ipv4(packet.GetOption('ip_address_lease_time')).int()
 		
 		self._lease_valid = True
 		
@@ -327,6 +347,9 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 			'DNS ' + dns_space_sep,
 			'SERVER ' + str(self._last_serverid),
 			'LEASETIME ' + str(self._last_leasetime))
+		print('Starting renew thread')
+		self._renew_thread = threading.Timer(self._last_leasetime / 2000, self.sendDhcpRenew, [])
+		self._renew_thread.start()
 	
 	def HandleDhcpAck(self, packet):
 		"""
@@ -371,11 +394,14 @@ client = BasicDhcpClient(ifname = 'eth0', conn = system_bus)
 
 client.sendDhcpDiscover()
 
-while True :
-	next_packet = client.GetNextDhcpPacket()
-	if next_packet != None:
-		packet_as_str=client.GetNextDhcpPacket().str()
-		#client.HelloSignal(packet_as_str)
-		#print(packet_as_str)
-	else:
-		print('Waiting...')
+try:
+	while True :
+		next_packet = client.GetNextDhcpPacket()
+		if next_packet != None:
+			packet = client.GetNextDhcpPacket()
+			#print(packet.str())
+		else:
+			print('Waiting...')
+except:
+	client.exit()
+	raise

@@ -5,8 +5,6 @@ from __future__ import print_function
 
 import sys
 
-sys.path.insert(0, '/opt/pydhcplib2/lib/python2.7/site-packages/')
-
 import dbus
 import dbus.service
 import dbus.mainloop.glib
@@ -18,8 +16,7 @@ import MacAddr
 import threading
 import time
 
-r = Random()
-r.seed()
+sys.path.insert(0, '/opt/pydhcplib2/lib/python2.7/site-packages/')
 
 from pydhcplib.dhcp_packet import *
 from pydhcplib.dhcp_network import *
@@ -117,6 +114,8 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		self._renew_thread = None
 		self._release_thread = None
 		
+		self._random = None
+		
 		if mac_addr is None:
 			if self._ifname:
 				self._mac_addr = MacAddr.getHwAddrForIf(ifname = self._ifname)
@@ -170,7 +169,11 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		It will be stored inside the _current_xid property of this object and used in all subsequent DHCP packets sent by this object
 		It can be retrieved using getXid()
 		"""
-		self._current_xid = r.randint(0,0xffffffff)
+		if self._random is None:
+			self._random = Random()
+			self._random.seed()
+
+		self._current_xid = self._random.randint(0,0xffffffff)
 	
 	def _getXitAsDhcpOption(self):
 		"""

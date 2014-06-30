@@ -33,7 +33,7 @@ DHCP_TYPES = ['UNKNOWN',
 ]
 
 DBUS_OBJECT_PATH = '/com/legrandelectric/RobotFrameworkIPC'	# The name of the D-Bus object under which we will communicate on D-Bus
-DBUS_SERVICE_PATH = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'	# The name of the D-Bus service under which we will perform input/output on D-Bus
+DBUS_SERVICE_INTERFACE = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'	# The name of the D-Bus service under which we will perform input/output on D-Bus
 
 CLIENT_ID_HWTYPE_ETHER = 0x01
 
@@ -129,31 +129,31 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		self.genNewXid()
 	
 	# D-Bus-related methods
-	@dbus.service.signal(DBUS_SERVICE_PATH)
+	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpDiscoverSent(self):
 		pass
 	
-	@dbus.service.signal(DBUS_SERVICE_PATH)
+	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpOfferRecv(self, ip, server):
 		pass
 	
-	@dbus.service.signal(DBUS_SERVICE_PATH)
+	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpRequestSent(self):
 		pass
 	
-	@dbus.service.signal(DBUS_SERVICE_PATH)
+	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpRenewSent(self):
 		pass
 		
-	@dbus.service.signal(DBUS_SERVICE_PATH)
+	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpReleaseSent(self, ip):
 		pass
 	
-	@dbus.service.signal(DBUS_SERVICE_PATH)
+	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpAckRecv(self, ip, netmask, defaultgw, dns, server, leasetime):
 		pass
 	
-	@dbus.service.method(DBUS_SERVICE_PATH, in_signature='', out_signature='')
+	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
 	def Exit(self):
 		pass
 		#loop.quit()	# When we will have a D-Bus main loop
@@ -478,7 +478,7 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 system_bus = dbus.SystemBus(private=True)
-name = dbus.service.BusName(DBUS_SERVICE_PATH, system_bus)
+name = dbus.service.BusName(DBUS_SERVICE_INTERFACE, system_bus)
 client = BasicDhcpClient(ifname = 'eth0', conn = system_bus)
 
 #gobject.timeout_add(1000,client.emitHelloSignal)

@@ -111,10 +111,13 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		
 		self._parameter_list = None	# DHCP Parameter request list (options requested from the DHCP server)
 		
-		self._renew_thread = None
-		self._release_thread = None
 		
 		self._random = None
+		
+		self._dhcp_status_mutex = threading.Lock()	# This mutex protects writes to any of the above member variables (all except thread references)
+
+		self._renew_thread = None
+		self._release_thread = None
 		
 		if mac_addr is None:
 			if self._ifname:
@@ -169,11 +172,15 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		It will be stored inside the _current_xid property of this object and used in all subsequent DHCP packets sent by this object
 		It can be retrieved using getXid()
 		"""
-		if self._random is None:
-			self._random = Random()
-			self._random.seed()
-
-		self._current_xid = self._random.randint(0,0xffffffff)
+		self._dhcp_status_mutex.acquire()
+		try:
+			if self._random is None:
+				self._random = Random()
+				self._random.seed()
+	
+			self._current_xid = self._random.randint(0,0xffffffff)
+		finally:
+			self._dhcp_status_mutex.release()
 	
 	def _getXitAsDhcpOption(self):
 		"""
@@ -192,7 +199,11 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		"""
 		Set the transaction ID that will be used for all subsequent DHCP packets sent by us
 		"""
-		self._current_xid = xid
+		self._dhcp_status_mutex.acquire()
+		try:
+			self._current_xid = xid
+		finally:
+			self._dhcp_status_mutex.release()
 	
 	def getXid(self):
 		"""
@@ -231,7 +242,9 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_discover.SetOption('flags',[128, 0])
 		dhcp_discover_type = dhcp_discover.GetOption('dhcp_message_type')[0]
 		print("==>Sending DISCOVER")
+		self._dhcp_status_mutex.acquire()
 		self._request_sent = False
+		self._dhcp_status_mutex.release()
 		self.DhcpDiscoverSent()	# Emit DBUS signal
 		self.SendDhcpPacketTo(dhcp_discover, '255.255.255.255', self._server_port)
 	
@@ -283,7 +296,9 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_request_type = dhcp_request.GetOption('dhcp_message_type')[0]
 		print("==>Sending REQUEST")
 		self.DhcpRequestSent()	# Emit DBUS signal
+		self._dhcp_status_mutex.acquire()
 		self._request_sent = True
+		self._dhcp_status_mutex.release()
 		self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
 		
 	def sendDhcpRenew(self, ciaddr = None, dstipaddr = '255.255.255.255'):
@@ -317,8 +332,10 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_request.SetOption('flags', [128, 0])
 		dhcp_request_type = dhcp_request.GetOption('dhcp_message_type')[0]
 		print("==>Sending REQUEST (renewing lease)")
-		self._request_sent = True
 		self.DhcpRenewSent()	# Emit DBUS signal
+		self._dhcp_status_mutex.acquire()
+		self._request_sent = True
+		self._dhcp_status_mutex.release()
 		self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
 		self._renew_thread = threading.Timer(self._last_leasetime / 6, self.sendDhcpRenew, [])	# After the first renew is sent, increase the frequency of the next renew packets
 		self._renew_thread.start()
@@ -328,11 +345,10 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		"""
 		Send a DHCP RELEASE to release the current lease
 		"""
-		if not self._release_thread is None:
-			self._release_thread.cancel()
-			self._release_thread = None	# Delete pointer to our own thread handle now that we have been called
+		if not self._renew_thread is None: self._renew_thread.cancel()	# Cancel the renew timeout
+		if not self._release_thread is None: self._release_thread.cancel()	# Cancel the release timeout
+		self._release_thread = None	# Delete pointer to our own thread handle now that we have been called
 		if not self._renew_thread is None:	# If there was a lease currently obtained
-			self._renew_thread.cancel()
 			self._renew_thread = None	# Delete pointer to the renew (we have lost our lease)
 			
 			if not self._last_ipaddress is None:	# Do we have a lease?
@@ -355,6 +371,7 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 				dhcp_release_type = dhcp_release.GetOption('dhcp_message_type')[0]
 				print("==>Sending RELEASE")
 				self.DhcpReleaseSent('IP ' +str(self._last_ipaddress))	# Emit DBUS signal
+				self._dhcp_status_mutex.acquire()
 				self._request_sent = False
 				
 				self._last_ipaddress = None
@@ -366,7 +383,8 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 				self._last_leasetime = None
 				
 				self._lease_valid = False
-				
+				self._dhcp_status_mutex.release()
+
 				self.SendDhcpPacketTo(dhcp_release, '255.255.255.255', self._server_port)
 	
 	def handleDhcpAck(self, packet):
@@ -376,40 +394,47 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		print("==>Received ACK with content:")
 		print(packet.str())
 		#self.HelloSignal('<-ACK')
-		if self._request_sent:
-			self._request_sent = False
-		else:
-			print("Received an ACK without having sent a REQUEST")
-			raise Exception('UnexpectedAck')
+		self._dhcp_status_mutex.acquire()
+		try:
+			if self._request_sent:
+				self._request_sent = False
+			else:
+				print("Received an ACK without having sent a REQUEST")
+				raise Exception('UnexpectedAck')
+			
+			self._last_ipaddress = ipv4(packet.GetOption('yiaddr'))
+			self._last_netmask = ipv4(packet.GetOption('subnet_mask'))
+			self._last_defaultgw = ipv4(packet.GetOption('router'))	# router is of type ipv4+ so we could get more than one router IPv4 address... but we only pick up the first one here
+			
+			self._last_dnsip_list = []
+			
+			dnsip_array = packet.GetOption('domain_name_server')	# DNS is of type ipv4+ so we could get more than one router IPv4 address... handle all DNS entries in a list
+			for i in range(0, len(dnsip_array), 4):
+				if len(dnsip_array[i:i+4]) == 4:
+					self._last_dnsip_list += [ipv4(dnsip_array[i:i+4])]
+			
+			self._last_serverid = ipv4(packet.GetOption('server_identifier'))
+			self._last_leasetime = ipv4(packet.GetOption('ip_address_lease_time')).int()
+			
+			self._lease_valid = True
+			
+			dns_space_sep = ' '.join(map(str, self._last_dnsip_list))
+			
+			self.DhcpAckRecv('IP ' + str(self._last_ipaddress),
+				'NETMASK ' + str(self._last_netmask),
+				'DEFAULTGW ' + str(self._last_defaultgw),
+				'DNS ' + dns_space_sep,
+				'SERVER ' + str(self._last_serverid),
+				'LEASETIME ' + str(self._last_leasetime))
+		finally:
+			self._dhcp_status_mutex.release()
 		
-		self._last_ipaddress = ipv4(packet.GetOption('yiaddr'))
-		self._last_netmask = ipv4(packet.GetOption('subnet_mask'))
-		self._last_defaultgw = ipv4(packet.GetOption('router'))	# router is of type ipv4+ so we could get more than one router IPv4 address... but we only pick up the first one here
-		
-		self._last_dnsip_list = []
-		dnsip_array = packet.GetOption('domain_name_server')	# DNS is of type ipv4+ so we could get more than one router IPv4 address... handle all DNS entries in a list
-		for i in range(0, len(dnsip_array), 4):
-			if len(dnsip_array[i:i+4]) == 4:
-				self._last_dnsip_list += [ipv4(dnsip_array[i:i+4])]
-		
-		self._last_serverid = ipv4(packet.GetOption('server_identifier'))
-		self._last_leasetime = ipv4(packet.GetOption('ip_address_lease_time')).int()
-		
-		self._lease_valid = True
-		
-		dns_space_sep = ' '.join(map(str, self._last_dnsip_list))
-		
-		self.DhcpAckRecv('IP ' + str(self._last_ipaddress),
-			'NETMASK ' + str(self._last_netmask),
-			'DEFAULTGW ' + str(self._last_defaultgw),
-			'DNS ' + dns_space_sep,
-			'SERVER ' + str(self._last_serverid),
-			'LEASETIME ' + str(self._last_leasetime))
 		print('Starting renew thread')
-		if not self._renew_thread is None: self._renew_thread.cancel()	# Cancel the release timeout
+		if not self._renew_thread is None: self._renew_thread.cancel()	# Cancel the renew timeout
+		if not self._release_thread is None: self._release_thread.cancel()	# Cancel the release timeout
+		
 		self._renew_thread = threading.Timer(self._last_leasetime / 2, self.sendDhcpRenew, [])
 		self._renew_thread.start()
-		if not self._release_thread is None: self._release_thread.cancel()	# Cancel the release timeout
 		self._release_thread = threading.Timer(self._last_leasetime, self.sendDhcpRelease, [])	# Restart the release timeout
 		self._release_thread.start()
 	
@@ -425,6 +450,8 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		Today, this will raise an exception. No processing will be done on such packets
 		"""
 		
+		self._dhcp_status_mutex.acquire()
+
 		self._last_ipaddress = None
 		self._last_netmask = None
 		self._last_defaultgw = None
@@ -436,6 +463,8 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		
 		self._request_sent = False
 		
+		self._dhcp_status_mutex.release()
+	
 		print("==>Received NACK:")
 		print(packet.str())
 		raise Exception('DhcpNack')

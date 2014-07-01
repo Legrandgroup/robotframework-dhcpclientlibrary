@@ -22,6 +22,7 @@ sys.path.insert(0, '/opt/pydhcplib2/lib/python2.7/site-packages/')
 from pydhcplib.dhcp_packet import *
 from pydhcplib.dhcp_network import *
 
+# DHCP types names array (index is the DHCP type)
 DHCP_TYPES = ['UNKNOWN',
 	'DISCOVER', # 1
 	'OFFER', # 2
@@ -36,7 +37,7 @@ DHCP_TYPES = ['UNKNOWN',
 DBUS_OBJECT_PATH = '/com/legrandelectric/RobotFrameworkIPC'	# The name of the D-Bus object under which we will communicate on D-Bus
 DBUS_SERVICE_INTERFACE = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'	# The name of the D-Bus service under which we will perform input/output on D-Bus
 
-CLIENT_ID_HWTYPE_ETHER = 0x01
+CLIENT_ID_HWTYPE_ETHER = 0x01	# HWTYPE byte as used in the client_identifier DHCP option
 
 def dhcpNameToType(name, exception_on_unknown = True):
 	"""
@@ -70,7 +71,7 @@ def dhcpTypeToName(type, exception_on_unknown = True):
 
 
 class BasicDhcpClient(DhcpClient, dbus.service.Object):
-	def __init__(self, conn, object_path=DBUS_OBJECT_PATH, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, **kwargs):
+	def __init__(self, conn, dbus_loop, object_path=DBUS_OBJECT_PATH, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, **kwargs):
 		"""
 		Instanciate a new BasicDhcpClient client bound to ifname (if specified) or a specific interface address listen_address (if specified)
 		Client listening UDP port and server destination UDP port can also be overridden from their default values
@@ -104,14 +105,17 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		
 		self._random = None
 		
-		self._dhcp_status_mutex = threading.Lock()	# This mutex protects writes to any of the above member variables (all except thread references)
+		self._dhcp_status_mutex = threading.Lock()	# This mutex protects writes to any of the DHCP state machine and environment (so this does not include the variables below)
 
 		self._renew_thread = None
 		self._release_thread = None
 		
-		self._dhcpInLoopStop = threading.Event()
-		self._dhcp_packet_processing_thread = threading.Thread(target = self._loopGetNextDhcpPacket)	# Start receiving DHCP packets (and processing them using the pydhcplib callbacks). This thread will run until self._loopDhcp=False
-		self._dhcp_packet_processing_thread.start()
+		self._dbus_loop = dbus_loop
+
+		self._dbus_loop_thread = threading.Thread(target = self._loopHandleDbus)	# Start handling D-Bus messages in a background thread.
+		self._dbus_loop_thread.start()
+		
+		self._on_exit_callback = None
 		
 		if mac_addr is None:
 			if self._ifname:
@@ -120,31 +124,66 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 				self._mac_addr = MacAddr.getHwAddrForIp(ip = self._listen_address)
 			else:
 				raise Exception('NoInterfaceProvided')
-		self.genNewXid()
+		self.genNewXid()	# Generate a random transaction ID for future packet exchanges
+	
+	def setOnExit(self, function):
+		"""
+		Set the function that will be called when this object's exit() method is called (as a result of a D-Bus message or if .exit() is called directly
+		""" 
+		if not hasattr(function, '__call__'):	# Argument is not callable
+			raise('NotAFunction')
+		self._on_exit_callback = function
 	
 	# D-Bus-related methods
+	def _loopHandleDbus(self):
+		"""
+		This method should be run within a thread... This thread's aim is to run the Glib's main loop while the main thread does other actions in the meantime
+		This methods will loop infinitely to receive and send D-Bus messages and will only stop looping when the value of self._loopDbus is set to False (or when the Glib's main loop is stopped using .quit()) 
+		"""
+		print("Starting dbus mainloop")
+		self._dbus_loop.run()
+		print("Stopping dbus mainloop")
+	
 	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpDiscoverSent(self):
+		"""
+		D-Bus decorated method to send the "DhcpDiscoverSent" signal
+		"""
 		pass
 	
 	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpOfferRecv(self, ip, server):
+		"""
+		D-Bus decorated method to send the "DhcpOfferRecv" signal
+		"""
 		pass
 	
 	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpRequestSent(self):
+		"""
+		D-Bus decorated method to send the "DhcpRequestSent" signal
+		"""
 		pass
 	
 	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpRenewSent(self):
+		"""
+		D-Bus decorated method to send the "DhcpRenewSent" signal
+		"""
 		pass
 		
 	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpReleaseSent(self, ip):
+		"""
+		D-Bus decorated method to send the "DhcpReleaseSent" signal
+		"""
 		pass
 	
 	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpAckRecv(self, ip, netmask, defaultgw, dns, server, leasetime):
+		"""
+		D-Bus decorated method to send the "DhcpAckRecv" signal
+		"""
 		pass
 	
 	def exit(self):
@@ -152,7 +191,9 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		Cleanup object and stop all threads
 		"""
 		self.sendDhcpRelease()	# Release our current lease if any (this will also clear all DHCP-lease-related threads)
-		self._dhcpInLoopStop.set()	# Stop processing DHCP packets
+		self._dbus_loop.quit()	# Stop the D-Bus main loop
+		if not self._on_exit_callback is None:
+			self._on_exit_callback()
 
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
 	def Exit(self):
@@ -164,14 +205,16 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
 	def Renew(self):
 		"""
-		D-Bus method to force a renew before the renew timeout
+		D-Bus decorated method executed when receiving the D-Bus "Renew" message call
+		This method will force a renew before the renew timeout
 		"""
 		self.sendDhcpRenew()
 
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
 	def Restart(self):
 		"""
-		D-Bus method to force restarting the whol DHCP discovery process from the beginning
+		D-Bus decorated method executed when receiving the D-Bus "Restart" message call
+		This method will force restarting the whole DHCP discovery process from the beginning
 		"""
 		self.sendDhcpRelease()	# Release our current lease if any (this will also clear all DHCP-lease-related threads)
 		self.sendDhcpDiscover()	# Restart the DHCP discovery
@@ -179,7 +222,8 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
 	def FreezeRenew(self):
 		"""
-		D-Bus method to stop any renew from being sent (even after the lease will expire)
+		D-Bus decorated method executed when receiving the D-Bus "FreezeRenew" message call
+		This method will stop any renew from being sent (even after the lease will expire)
 		It will also stop any release from being sent out... basically, we will mute the DHCP client messaging to the server
 		"""
 		if not self._renew_thread is None: self._renew_thread.cancel()	# Cancel the renew timeout
@@ -187,23 +231,13 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 	
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='s', out_signature='')
 	def Debug(self, msg):
-		print("Debug message from D-Bus : " + str(msg))
+		"""
+		D-Bus decorated method executed when receiving the D-Bus "Debug" message call
+		This method will just echo on stdout the string given as argument
+		"""
+		print('Received echo message from D-Bus: "' + str(msg) + '"')
 	
 	# DHCP-related methods
-	def _loopGetNextDhcpPacket(self):
-		"""
-		This method loops infinitely to get more incoming DHCP packets and process them
-		It should be run within a thread... and will stop looping when the value of self._loopDhcp is set to False
-		"""
-		print("Starting handling incoming DHCP packets")
-		while not self._dhcpInLoopStop.isSet():
-			packet = self.GetNextDhcpPacket(timeout = 1)
-			if not packet is None:
-				print("Received packet")
-			else:
-				print("Waiting...")
-			 
-		
 	def genNewXid(self):
 		"""
 		Generate a new random DHCP transaction ID
@@ -223,6 +257,7 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 	def _getXitAsDhcpOption(self):
 		"""
 		Get the current xid property of this object, encoded as a DhcpOption format that can be used with DhcpPacket.SetOption()
+		The format returned is an array of 4 bytes
 		"""
 		if self._current_xid is None:
 			return None
@@ -236,6 +271,7 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 	def setXid(self, xid):
 		"""
 		Set the transaction ID that will be used for all subsequent DHCP packets sent by us
+		We are expecting a 32-bit integer as argument xid
 		"""
 		self._dhcp_status_mutex.acquire()
 		try:
@@ -245,7 +281,7 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 	
 	def getXid(self):
 		"""
-		Set the transaction ID that is currently used for all DHCP packets sent by us
+		Get the transaction ID that is currently used for all DHCP packets sent by us
 		"""
 		return self._current_xid
 		
@@ -514,17 +550,18 @@ class BasicDhcpClient(DhcpClient, dbus.service.Object):
 		self.handleDhcpNack(packet)
 
 
-dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)	# Use Glib's mainloop as the default loop for all subsequent code
 loop = gobject.MainLoop()	# Get the gobject's main loop that will be used to process D-Bus messages
 system_bus = dbus.SystemBus(private=True)
-name = dbus.service.BusName(DBUS_SERVICE_INTERFACE, system_bus)
-client = BasicDhcpClient(ifname = 'eth0', conn = system_bus)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
+gobject.threads_init()	# Allow the mainloop to run as an independant thread
+name = dbus.service.BusName(DBUS_SERVICE_INTERFACE, system_bus)	# Grab a reference to the D-Bus interface we will use to send/receive on D-Bus
+client = BasicDhcpClient(ifname = 'eth0', conn = system_bus, dbus_loop = gobject.MainLoop())	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
+#client.setOnExit(exit)	# Tell the client to call exit() when it shuts down (this will allow direct exit() instead of waiting on client.GetNextDhcpPacket() to timeout in the loop below
 
-#gobject.timeout_add(1000,client.emitHelloSignal)
-
-client.sendDhcpDiscover()
+client.sendDhcpDiscover()	# Send a DHCP DISCOVER on the network
 
 try:
-	loop.run()	# Process D-Bus signal
+	while True:
+		client.GetNextDhcpPacket()	# Handle incoming DHCP packets
 finally:
 	client.exit()

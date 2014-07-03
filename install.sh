@@ -91,7 +91,7 @@ if ! type -p python 2>/dev/null; then
   exit 1
 fi
 
-for package in pydhcplib PyIface-master
+for package in pydhcplib
 do
   install_python_package "${package}" "${INSTALL_DIR}"
 done

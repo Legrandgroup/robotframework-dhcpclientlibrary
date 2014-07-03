@@ -79,10 +79,10 @@ def dhcpTypeToName(type, exception_on_unknown = True):
 			return 'UNKNOWN'
 
 
-class BasicDhcpClient(DhcpClient, dbus.service.Object):
+class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 	def __init__(self, conn, dbus_loop, object_path=DBUS_OBJECT_PATH, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, apply_ip = False, **kwargs):
 		"""
-		Instanciate a new BasicDhcpClient client bound to ifname (if specified) or a specific interface address listen_address (if specified)
+		Instanciate a new DBusControlledDhcpClient client bound to ifname (if specified) or a specific interface address listen_address (if specified)
 		Client listening UDP port and server destination UDP port can also be overridden from their default values
 		"""
 		
@@ -626,7 +626,7 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 	system_bus = dbus.SystemBus(private=True)
 	gobject.threads_init()	# Allow the mainloop to run as an independant thread
 	name = dbus.service.BusName(DBUS_SERVICE_INTERFACE, system_bus)	# Grab a reference to the D-Bus interface we will use to send/receive on D-Bus
-	client = BasicDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
+	client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
 	client.setOnExit(exit)	# Tell the client to call exit() when it shuts down (this will allow direct program termination when receiving a D-Bus Exit() message instead of waiting on client.GetNextDhcpPacket() to timeout in the loop below
 	
 	client.sendDhcpDiscover()	# Send a DHCP DISCOVER on the network

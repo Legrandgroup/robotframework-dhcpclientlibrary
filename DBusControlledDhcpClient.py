@@ -43,6 +43,7 @@ DHCP_TYPES = ['UNKNOWN',
 	'INFORM', # 8
 ]
 
+DBUS_NAME = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'	# The name of bus we are creating in D-Bus
 DBUS_OBJECT_PATH = '/com/legrandelectric/RobotFrameworkIPC'	# The name of the D-Bus object under which we will communicate on D-Bus
 DBUS_SERVICE_INTERFACE = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'	# The name of the D-Bus service under which we will perform input/output on D-Bus
 
@@ -625,7 +626,7 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 	loop = gobject.MainLoop()	# Get the gobject's main loop that will be used to process D-Bus messages
 	system_bus = dbus.SystemBus(private=True)
 	gobject.threads_init()	# Allow the mainloop to run as an independant thread
-	name = dbus.service.BusName(DBUS_SERVICE_INTERFACE, system_bus)	# Grab a reference to the D-Bus interface we will use to send/receive on D-Bus
+	name = dbus.service.BusName(DBUS_NAME, system_bus)	# Grab a reference to the D-Bus interface we will use to send/receive on D-Bus
 	client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
 	client.setOnExit(exit)	# Tell the client to call exit() when it shuts down (this will allow direct program termination when receiving a D-Bus Exit() message instead of waiting on client.GetNextDhcpPacket() to timeout in the loop below
 	

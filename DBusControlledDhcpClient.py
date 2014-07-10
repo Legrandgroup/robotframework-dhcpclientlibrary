@@ -81,7 +81,7 @@ def dhcpTypeToName(type, exception_on_unknown = True):
 
 
 class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
-	def __init__(self, conn, dbus_loop, object_path=DBUS_OBJECT_PATH, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, apply_ip = False, **kwargs):
+	def __init__(self, conn, dbus_loop, object_path=DBUS_OBJECT_PATH, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, apply_ip = False, dump_packets = False, **kwargs):
 		"""
 		Instanciate a new DBusControlledDhcpClient client bound to ifname (if specified) or a specific interface address listen_address (if specified)
 		Client listening UDP port and server destination UDP port can also be overridden from their default values
@@ -133,6 +133,8 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		self._apply_ip = apply_ip
 		if self._apply_ip and not self._ifname:
 			raise Exception('NoIfaceProvidedWithApplyIP')
+		
+		self._dump_packets = dump_packets
 		
 		if mac_addr is None:
 			if self._ifname:
@@ -222,15 +224,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		Cleanup object and stop all threads
 		"""
 		self.sendDhcpRelease()	# Release our current lease if any (this will also clear all DHCP-lease-related threads)
-		if self._iface_modified:	# Clean up our ip configuration (revert to standard config for this interface)
-			if not self._ifname:
-				raise Exception('NoIfaceProvidedWithApplyIP')
-			cmdline = ['ifdown', str(self._ifname)]
-			print(cmdline)
-			subprocess.call(cmdline)
-			cmdline = ['ifup', str(self._ifname)]
-			print(cmdline)
-			subprocess.call(cmdline)
+		self._unconfigure_iface()	# Clean up our ip configuration (revert to standard config for this interface)
 
 		self._dbus_loop.quit()	# Stop the D-Bus main loop
 		if not self._on_exit_callback is None:
@@ -281,6 +275,10 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 	
 	# IP self configuration-related methods
 	def applyIpAddressFromDhcpLease(self):
+		"""
+		Apply the IP address and netmask that we currently have in out self._last_ipaddress and self._last_netmask (got from last lease)
+		Warning : we won't check if the lease is still valid now, this is up to the caller
+		""" 
 		self._iface_modified = True
 		cmdline = ['ifconfig', str(self._ifname), '0.0.0.0']
 		print(cmdline)
@@ -290,6 +288,10 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		subprocess.call(cmdline)
 	
 	def applyDefaultGwFromDhcpLease(self):
+		"""
+		Apply the default gatewau that we currently have in out self._last_defaultgw (got from last lease)
+		Warning : we won't check if the lease is still valid now, this is up to the caller
+		""" 
 		self._iface_modified = True
 		cmdline = ['route', 'add', 'default', 'gw', str(self._last_defaultgw)]
 		print(cmdline)
@@ -342,7 +344,27 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		Get the transaction ID that is currently used for all DHCP packets sent by us
 		"""
 		return self._current_xid
-		
+	
+	def _unconfigure_iface(self):
+		"""
+		Unconfigure our interface (fall back to its default system config)
+		Warning, we will not modify the current lease information stored in this object however
+		"""
+		if self._iface_modified:	# Clean up our ip configuration (revert to standard config for this interface)
+			if not self._ifname:
+				raise Exception('NoIfaceProvidedWithApplyIP')
+			cmdline = ['ifdown', str(self._ifname)]
+			print(cmdline)
+			subprocess.call(cmdline)
+			time.sleep(0.2)	# Grrrr... on some implementations, ifdown returns too early (before actually doing its job)
+			cmdline = ['ifconfig', str(self._ifname), '0.0.0.0', 'down']	# Make sure we get rid of the IP address
+			print(cmdline)
+			subprocess.call(cmdline)
+			cmdline = ['ifup', str(self._ifname)]
+			print(cmdline)
+			subprocess.call(cmdline)
+			self._iface_modified = False
+
 	def sendDhcpDiscover(self, parameter_list = None):
 		"""
 		Send a DHCP DISCOVER packet to the network
@@ -386,8 +408,13 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		"""
 		dhcp_offer = res
 		dhcp_message_type = dhcp_offer.GetOption('dhcp_message_type')[0]
-		print("==>Received " + dhcpTypeToName(dhcp_message_type, False) + " with content:")
-		print(dhcp_offer.str())
+		message = "==>Received " + dhcpTypeToName(dhcp_message_type, False)
+		if self._dump_packets:
+			message += ' with content:'
+		print(message)
+		if self._dump_packets:
+			print(dhcp_offer.str())
+		
 		proposed_ip = ipv4(dhcp_offer.GetOption('yiaddr'))
 		server_id = ipv4(dhcp_offer.GetOption('server_identifier'))
 		self.DhcpOfferRecv('IP ' + str(proposed_ip), 'SERVER ' + str(server_id))	# Emit DBUS signal with proposed IP address
@@ -523,8 +550,13 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		"""
 		Handle a DHCP ACK packet coming from the network
 		"""
-		print("==>Received ACK with content:")
-		print(packet.str())
+		message = "==>Received ACK"
+		if self._dump_packets:
+			message += ' with content:'
+		print(message)
+		if self._dump_packets:
+			print(packet.str())
+		
 		self._dhcp_status_mutex.acquire()
 		try:
 			if self._request_sent:
@@ -587,6 +619,13 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		Today, this will raise an exception. No processing will be done on such packets
 		"""
 		
+		message = "==>Received NACK"
+		if self._dump_packets:
+			message += ' with content:'
+		print(message)
+		if self._dump_packets:
+			print(packet.str())
+
 		self._dhcp_status_mutex.acquire()
 
 		self._last_ipaddress = None
@@ -601,9 +640,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		self._request_sent = False
 		
 		self._dhcp_status_mutex.release()
-	
-		print("==>Received NACK:")
-		print(packet.str())
+		
 		raise Exception('DhcpNack')
 	
 	def HandleDhcpNack(self, packet):
@@ -621,13 +658,14 @@ It will report every DHCP client state change via D-Bus signal. \
 It will also accept D-Bus method calls to change its behaviour (see Exit(), Renew(), Restart() and FreezeRenew() methods.", prog=progname)
 	parser.add_argument('-i', '--ifname', type=str, help='network interface on which to send/receive DHCP packets', required=True)
 	parser.add_argument('-A', '--applyconfig', action='store_true', help='apply the IP config (ip address, netmask and default gateway) to the interface when lease is obtained')
-	parser.add_argument('-d', '--debug', action='store_true', help='display debug info')
+	parser.add_argument('-D', '--dumppackets', action='store_true', help='dump received packets content', default=False)
+	parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
 	args = parser.parse_args()
 	
 	system_bus = dbus.SystemBus(private=True)
 	gobject.threads_init()	# Allow the mainloop to run as an independent thread
 	name = dbus.service.BusName(DBUS_NAME, system_bus)      # Publish the name to the D-Bus so that clients can see us
-	client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
+	client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
 	client.setOnExit(exit)	# Tell the client to call exit() when it shuts down (this will allow direct program termination when receiving a D-Bus Exit() message instead of waiting on client.GetNextDhcpPacket() to timeout in the loop below
 	
 	client.sendDhcpDiscover()	# Send a DHCP DISCOVER on the network

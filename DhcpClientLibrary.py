@@ -7,16 +7,17 @@ from __future__ import print_function
 
 import os
 import sys
+import threading
 
+import gobject
+import dbus
+import dbus.mainloop.glib
+
+import time
+import datetime
 import subprocess
 import signal
 
-from dbus.mainloop.glib import DBusGMainLoop
-
-import dbus
-import gobject
-
-DBusGMainLoop(set_as_default=True)
 
 
 class DhcpClientStatus:
@@ -29,9 +30,9 @@ class DhcpClientStatus:
         self.ipv4_defaultgw = None
         self.ipv4_dnslist = [None]
         self.ipv4_dhcpserverid = None
-        self.ipv4_lease_valid = False
-        self.ipv4_leaseduration = None
-        self.ipv4_leaseexpiry = None
+        self.ipv4_lease_valid = False   # Is the lease valid?
+        self.ipv4_leaseduration = None  # How long the lease lasts
+        self.ipv4_leaseexpiry = None    # When the lease will expire (in UTC time), as a time.struct_time object
         self.ipv4_dhcpclientfailure = True
         self.ipv4_dhcpclientnbfailure = 0
 
@@ -57,6 +58,12 @@ class DhcpClientStatus:
         return temp
 
 
+def catchall_signal_handler(*args, **kwargs):
+    print("Caught signal (in catchall handler) " + kwargs['dbus_interface'] + "." + kwargs['member'])
+    for arg in args:
+        print("        " + str(arg))
+
+
 class RemoteDhcpClient:
 
     """ DHCP client object representing the remote DHCP client process with which we interface via D-Bus """
@@ -66,69 +73,87 @@ class RemoteDhcpClient:
     DBUS_OBJECT_PATH = '/com/legrandelectric/RobotFrameworkIPC'    # The name of the D-Bus object under which we will communicate on D-Bus
     DBUS_SERVICE_INTERFACE = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'    # The name of the D-Bus service under which we will perform input/output on D-Bus
 
-    def __init__(self, loop):
-        """ DBus connection """
+    def __init__(self):
+        """
+        Instanciate a new RemoteDhcpClient object that represents a DHCP client remotely-controlled via D-Bus
+        This RemoteDhcpClient object will mimic the status/methods of the remotely-controlled DHCP client so that we can interact with RemoteDhcpClient without any knowledge of the actual remotely-controller DHCP client
+        """
 
-        self._loop = loop
-        self._bus = None
-        self._dhcp_client_proxy = None
-        self._dbus_iface = None
+        self._dbus_loop = gobject.MainLoop()
+        self._bus = dbus.SystemBus()
+        wait_bus_owner_timeout = 5  # Wait for 5s to have an owner for the bus name we are expecting
+        logger.debug('Going to wait for an owner on bus name ' + RemoteDhcpClient.DBUS_NAME)
+        while not self._bus.name_has_owner(RemoteDhcpClient.DBUS_NAME):
+            time.sleep(0.2)
+            wait_bus_owner_timeout -= 0.2
+            if wait_bus_owner_timeout <= 0: # We timeout without having an ower for the expected bus name
+                raise Exception('No owner found for bus name ' + RemoteDhcpClient.DBUS_NAME)
+        
+        logger.debug('Got an owner for bus name ' + RemoteDhcpClient.DBUS_NAME)
+        gobject.threads_init()    # Allow the mainloop to run as an independent thread
+        
+        self._dhcp_client_proxy = self._bus.get_object(RemoteDhcpClient.DBUS_SERVICE_INTERFACE, RemoteDhcpClient.DBUS_OBJECT_PATH)
+        self._dbus_iface = dbus.Interface(self._dhcp_client_proxy, RemoteDhcpClient.DBUS_SERVICE_INTERFACE)
+        
+        logger.debug("Connected to D-Bus")
+        self._dhcp_client_proxy.connect_to_signal("IpConfigApplied",
+                                                  self._handleIpConfigApplied,
+                                                  dbus_interface = RemoteDhcpClient.DBUS_SERVICE_INTERFACE,
+                                                  message_keyword='dbus_message')   # Handle the IpConfigApplied signal
+        self._dhcp_client_proxy.connect_to_signal("IpDnsReceived",
+                                                  self._handleIpDnsReceived,
+                                                  dbus_interface = RemoteDhcpClient.DBUS_SERVICE_INTERFACE,
+                                                  message_keyword='dbus_message')   # Handle the IpDnsReceived signal
+        #Lionel: this is for D-Bus debugging only
+        #self._bus.add_signal_receiver(catchall_signal_handler, interface_keyword='dbus_interface', member_keyword='member')
+        self._dbus_loop_thread = threading.Thread(target = self._loopHandleDbus)    # Start handling D-Bus messages in a background thread
+        self._dbus_loop_thread.setDaemon(True)    # dbus loop should be forced to terminate when main program exits
+        self._dbus_loop_thread.start()
+        
         self.status = DhcpClientStatus()
         
-    def _wait_daemon(self, timeout=10):
+    # D-Bus-related methods
+    def _loopHandleDbus(self):
         """
-        Wait until the slave process daemon is available via D-Bus
+        This method should be run within a thread... This thread's aim is to run the Glib's main loop while the main thread does other actions in the meantime
+        This methods will loop infinitely to receive and send D-Bus messages and will only stop looping when the value of self._loopDbus is set to False (or when the Glib's main loop is stopped using .quit()) 
         """
-
-        maxtime = time.time() + int(timeout)
-        while True:
-            time.sleep(RemoteDhcpClient.POLL_WAIT)
-            if time.time() > maxtime:
-                logger.warn('DHCP client daemon not available')
-                break
-            if self.get_state() == 2:  # AVAHI_CLIENT_NO_FAIL
-                logger.debug('DHCP client daemon available')
-                break
-
-    def connect(self):
-        """
-        Initiate the D-Bus connection to the slave process
-        """
-
-        if self._bus is None:
-            try:
-                self._bus = dbus.SystemBus(private=True)
-                self._dhcp_client_proxy = self._bus.get_object(RemoteDhcpClient.DBUS_NAME, RemoteDhcpClient.DBUS_OBJECT_PATH)
-                self._dbus_iface = dbus.Interface(self._dhcp_client_proxy, RemoteDhcpClient.DBUS_SERVICE_INTERFACE)
-            except:
-                raise Exception("DBus exception occurs with type '%s' and value '%s'" % sys.exc_info()[:2])
-            logger.debug("DBus connected passed on '%s'" % self._bus)
-            self._wait_daemon()
-        else:
-            logger.debug('DBus connect failed on existing instance')
+        logger.debug("Starting dbus mainloop")
+        self._dbus_loop.run()
+        logger.debug("Stopping dbus mainloop")
         
-        print('Now listening to signals')
-        self._dbus_iface.connect_to_signal("DhcpAckRecv", self.handler, sender_keyword='sender')
     
-    def handler(sender=None):
-        print("got signal from %r" % sender)
+    def _handleIpConfigApplied(self, interface, ip, netmask, defaultgw, leasetime, **kwargs):
+        self.status.ipv4_address = ip
+        self.status.ipv4_netmask = netmask
+        self.status.ipv4_defaultgw = defaultgw
+        self.status.ipv4_lease_valid = True
+        self.status.ipv4_leaseduration = leasetime
+        self.status.ipv4_leaseexpiry = datetime.datetime.now() + datetime.timedelta(seconds = int(leasetime))    # Calculate the time when the lease will expire
+        logger.debug('Lease obtained for IP: ' + ip + '. Will expire at ' + str(self.status.ipv4_leaseexpiry)) 
+        # Lionel: FIXME: should start a timeout here to make the lease invalid at expiration 
+        
     
-    def disconnect(self):
+    def _handleIpDnsReceived(self, dns_space_sep_list, **kwargs):
+        self.status.ipv4_dnslist = dns_space_sep_list.split(' ')
+        logger.debug('Got DNS list: ' + str(self.status.ipv4_dnslist))
+        
+    def _discard(self):
+        logger.debug('Got called!')
+        
+    def exit(self):
         """
-        Disconnect from slave process on D-Bus
+        Send an Exit message to the remote DHCP client via D-Bus
         """
-
-        if self._bus:
-            try:
-                self._bus.close()
-            except:
-                raise Exception("DBus exception occurs with type '%s' and value '%s'" % sys.exc_info()[:2])
-            logger.debug("DBus close passed on '%s'" % self._bus)
-            self._bus = None
-            self._dhcp_client_proxy = None
-            self._dbus_iface = None
-        else:
-            logger.debug('DBus close failed on null instance')
+        # Stop the dbus loop
+        if not self._dbus_loop is None:
+            self._dbus_loop.quit()
+        
+        if self._dbus_iface is None:
+            raise Exception('Method invoked on non existing D-Bus interface')
+        
+        logger.debug('Sending Exit() to remote DHCP client')
+        self._dbus_iface.Exit(reply_handler = self._discard, error_handler = self._discard) # Call Exit() but ignore whether it gets acknowledged or not... this is because slave process may terminate before even acknowledge
 
 #===============================================================================
 #     def get_version(self):
@@ -250,8 +275,7 @@ class DhcpClientLibrary:
     ROBOT_LIBRARY_VERSION = '1.0'
 
     def __init__(self, dhcp_client_daemon_exec_path, ifname):
-        self._loop = gobject.MainLoop()
-        self._dhcp_client = None    # Slave process not started
+        self._remote_dhcp_client = None    # Slave process not started
         self._slave_dhcp_client_path = dhcp_client_daemon_exec_path
         self._slave_dhcp_client_proc = None
         self._slave_dhcp_client_pid = None
@@ -263,28 +287,9 @@ class DhcpClientLibrary:
         reconnect can connect if debug was stop or restarted and flush ingoing message
         """
 
-        self._dhcp_client.disconnect()
-        self._dhcp_client.connect()
+        self._remote_dhcp_client.disconnect()
+        self._remote_dhcp_client.connect()
 
-    def _browse_generic(self, stype):
-        """
-        Connect to D-Bus, and follow the slave DHCP client status
-        """
-
-        self._reconnect()
-        #self._dhcp_client.service_database.reset() # Lionel: No reset available on the DHCP state machine... or slave process will have to be killed
-        #self._dhcp_client.browse_service_type(stype) # Lionel: for now, don't control the RemoteDhcpClient object from here (it will do it stuff alone)
-        try:
-            logger.debug('DBus loop running')
-            self._loop.run()
-        except (KeyboardInterrupt, SystemExit):
-            self._loop.quit()
-            raise Exception("Exit from glib loop with type '%s' and value '%s'" % sys.exc_info()[:2])
-        except:
-            self._loop.quit()
-            raise Exception("DBus exception occurs in browse_generic with type '%s' and value '%s'" % sys.exc_info()[:2])
-        else:
-            logger.debug('DBus loop ending with database:%s' % self._dhcp_client.service_database)
 
     def start(self):
         """Start the DHCP client
@@ -294,15 +299,26 @@ class DhcpClientLibrary:
         """
         
         try:
-            args = ['sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A']
-            self._slave_dhcp_client_proc = subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+            cmd = ['sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A']
+            logger.debug('Running command ' + str(cmd))
+            self._slave_dhcp_client_proc = subprocess.Popen(cmd)#, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
             self._slave_dhcp_client_pid = self._slave_dhcp_client_proc.pid
+            #time.sleep(1)   # Wait until child registers to D-Bus
         except:
-            raise   # No exception handling for now 
-        logger.debug("Running '%s' with argument '%s' passed" % (self._slave_dhcp_client_path, args))
-        self._dhcp_client = RemoteDhcpClient(self._loop)
-        self._dhcp_client.connect()
+            raise   # No exception handling for now
+        self._remote_dhcp_client = RemoteDhcpClient()    # Create a RemoteDhcpClient object that symbolizes the control on the remote process (over D-Bus)
         logger.debug("Now connected to D-Bus")
+        
+#===============================================================================
+# If we want to be notified when child exists and releases the bus, we can use:
+#         def rhythmbox_owner_changed(new_owner):
+#             if new_owner == '':
+#                 print 'Rhythmbox is no longer running'
+#             else:
+#                 print 'Rhythmbox is now running'
+# 
+#             bus.watch_name_owner('org.gnome.Rhythmbox')
+#===============================================================================
         
     def stop(self):
         """ Stop the DHCP client
@@ -311,14 +327,20 @@ class DhcpClientLibrary:
         | Stop |
         """
 
-        self._dhcp_client.disconnect()
         if not self._slave_dhcp_client_proc is None:
-            # Lionel: Send D-Bus Exit() method?
+            if not self._remote_dhcp_client is None:
+                self._remote_dhcp_client.exit()
+            
             if not self._slave_dhcp_client_pid is None:
-                args = ['sudo', 'kill', '-SIGINT', str(self._slave_dhcp_client_pid)]    # Send Ctrl+C to slave DHCP client process
-                subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-                # Lionel: FIXME: we should check if slave process terminates or not within 1s else send a SIGKILL
-                self._slave_dhcp_client_pid = None
+                print('Sending SIGINT to child')
+                if not self._slave_dhcp_client_proc.poll():
+                    print('Child has already terminated')
+                else:
+                    args = ['sudo', 'kill', '-SIGINT', str(self._slave_dhcp_client_pid)]    # Send Ctrl+C to slave DHCP client process
+                    subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+                    # Lionel: FIXME: we should check if slave process terminates or not within 1s else send a SIGKILL
+                    self._slave_dhcp_client_pid = None
+                    self._slave_dhcp_client_proc.wait()
             self._slave_dhcp_client_proc = None
     
     def restart(self):
@@ -330,7 +352,7 @@ class DhcpClientLibrary:
 
         self.stop()
         self.start()
-        self._dhcp_client.connect()
+        self._remote_dhcp_client.connect()
 
 
 #===============================================================================
@@ -346,7 +368,7 @@ class DhcpClientLibrary:
 #         """
 # 
 #         self._browse_generic(stype)
-#         temp = self._dhcp_client.service_database.get_key_from_address(address)
+#         temp = self._remote_dhcp_client.service_database.get_key_from_address(address)
 #         if temp is not None:
 #             ret = temp
 #         else:
@@ -363,7 +385,7 @@ class DhcpClientLibrary:
 #         """
 # 
 #         self._browse_generic(stype)
-#         temp = self._dhcp_client.service_database.get_key_from_address(address)
+#         temp = self._remote_dhcp_client.service_database.get_key_from_address(address)
 #         if temp is not None:
 #             raise Exception("Service '%s' not expected on '%s'" % (stype, address))
 # 
@@ -379,7 +401,7 @@ class DhcpClientLibrary:
 #         """
 # 
 #         self._browse_generic(stype)
-#         temp = self._dhcp_client.service_database.get_address_from_mac(mac)
+#         temp = self._remote_dhcp_client.service_database.get_address_from_mac(mac)
 #         if temp is not None:
 #             ret = temp
 #         else:
@@ -399,11 +421,12 @@ class DhcpClientLibrary:
 #         | ${apname} |
 #         """
 # 
-#         ret = self._dhcp_client.service_database.get_info_from_key(key)[0]
+#         ret = self._remote_dhcp_client.service_database.get_info_from_key(key)[0]
 #         ret = unicode(ret)
 #         return ret
 #===============================================================================
 
+dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)    # Use Glib's mainloop as the default loop for all subsequent code
 
 if __name__ == '__main__':
     try:
@@ -431,7 +454,7 @@ if __name__ == '__main__':
     if os.path.isfile(DHCP_CLIENT_DAEMON):
         logger.debug('Autoselecting DHCP Client slave as "' + DHCP_CLIENT_DAEMON + '"')
     
-    client = DhcpClientLibrary(DHCP_CLIENT_DAEMON, 'eth0')
+    client = DhcpClientLibrary(DHCP_CLIENT_DAEMON, 'eth1')
     client.start()
     input('Press enter to stop slave')
     client.stop()

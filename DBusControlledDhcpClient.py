@@ -224,7 +224,6 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		Cleanup object and stop all threads
 		"""
 		self.sendDhcpRelease()	# Release our current lease if any (this will also clear all DHCP-lease-related threads)
-		self._unconfigure_iface()	# Clean up our ip configuration (revert to standard config for this interface)
 
 		self._dbus_loop.quit()	# Stop the D-Bus main loop
 		if not self._on_exit_callback is None:
@@ -237,6 +236,15 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		"""
 		print("Received Exit() command from D-Bus")
 		self.exit()	# Inherited dbus.service.Ibject has virtual methods written with an initial capital, so wrap around it to use our method naming convention
+
+	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
+	def Discover(self):
+		"""
+		D-Bus decorated method executed when receiving the D-Bus "Discover" message call
+		This method will force to send a DHCP discovery (but won't release the previous lease, nor remove its config from the internal records or from the pysical interface)
+		Use with care! 
+		"""
+		self.sendDhcpDiscover(release = False)
 
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
 	def Renew(self):
@@ -252,8 +260,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		D-Bus decorated method executed when receiving the D-Bus "Restart" message call
 		This method will force restarting the whole DHCP discovery process from the beginning
 		"""
-		self.sendDhcpRelease()	# Release our current lease if any (this will also clear all DHCP-lease-related threads)
-		self.sendDhcpDiscover()	# Restart the DHCP discovery
+		self.sendDhcpDiscover(release = True)	# Restart the DHCP discovery (and release our current lease if any (this will also clear all DHCP-lease-related threads))
 
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
 	def FreezeRenew(self):
@@ -365,12 +372,14 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 			subprocess.call(cmdline)
 			self._iface_modified = False
 
-	def sendDhcpDiscover(self, parameter_list = None):
+	def sendDhcpDiscover(self, parameter_list = None, release = True):
 		"""
 		Send a DHCP DISCOVER packet to the network
 		"""
 		# Cancel all renew and release threads
-		self.sendDhcpRelease()	# Release our current lease if any (this will also clear all DHCP-lease-related threads)
+		if release:
+			self.sendDhcpRelease()	# Release our current lease if any (this will also clear all DHCP-lease-related threads)
+		
 		dhcp_discover = DhcpPacket()
 		dhcp_discover.SetOption('op', [1])
 		dhcp_discover.SetOption('htype', [1])
@@ -500,7 +509,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		self._renew_thread.start()
 
 	
-	def sendDhcpRelease(self, ciaddr = None):
+	def sendDhcpRelease(self, ciaddr = None, unconfigure_iface = True):
 		"""
 		Send a DHCP RELEASE to release the current lease
 		"""
@@ -545,6 +554,9 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 				self._dhcp_status_mutex.release()
 
 				self.SendDhcpPacketTo(dhcp_release, '255.255.255.255', self._server_port)
+				
+			if unconfigure_iface:
+				self._unconfigure_iface()	# Clean up our ip configuration (revert to standard config for this interface)
 	
 	def handleDhcpAck(self, packet):
 		"""

@@ -563,7 +563,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 				self._request_sent = False
 			else:
 				print("Received an ACK without having sent a REQUEST")
-				raise Exception('UnexpectedAck')
+				#raise Exception('UnexpectedAck')
 			
 			self._last_ipaddress = ipv4(packet.GetOption('yiaddr'))
 			self._last_netmask = ipv4(packet.GetOption('subnet_mask'))

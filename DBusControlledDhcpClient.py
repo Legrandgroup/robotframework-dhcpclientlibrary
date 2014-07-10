@@ -204,7 +204,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		pass
 
 	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
-	def IpConfigApplied(self, interface, ip, netmask, defaultgw):
+	def IpConfigApplied(self, interface, ip, netmask, defaultgw, leasetime):
 		"""
 		D-Bus decorated method to send the "IpConfigApplied" signal
 		"""
@@ -227,10 +227,10 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 				raise Exception('NoIfaceProvidedWithApplyIP')
 			cmdline = ['ifdown', str(self._ifname)]
 			print(cmdline)
-			#subprocess.call(cmdline)
+			subprocess.call(cmdline)
 			cmdline = ['ifup', str(self._ifname)]
 			print(cmdline)
-			#subprocess.call(cmdline)
+			subprocess.call(cmdline)
 
 		self._dbus_loop.quit()	# Stop the D-Bus main loop
 		if not self._on_exit_callback is None:
@@ -241,6 +241,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		"""
 		D-Bus method to stop the DHCP client
 		"""
+		print("Received Exit() command from D-Bus")
 		self.exit()	# Inherited dbus.service.Ibject has virtual methods written with an initial capital, so wrap around it to use our method naming convention
 
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
@@ -283,16 +284,16 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		self._iface_modified = True
 		cmdline = ['ifconfig', str(self._ifname), '0.0.0.0']
 		print(cmdline)
-		#subprocess.call(cmdline)
+		subprocess.call(cmdline)
 		cmdline = ['ifconfig', str(self._ifname), str(self._last_ipaddress), 'netmask', str(self._last_netmask)]
 		print(cmdline)
-		#subprocess.call(cmdline)
+		subprocess.call(cmdline)
 	
 	def applyDefaultGwFromDhcpLease(self):
 		self._iface_modified = True
 		cmdline = ['route', 'add', 'default', 'gw', str(self._last_defaultgw)]
 		print(cmdline)
-		#subprocess.call(cmdline)
+		subprocess.call(cmdline)
 
 	# DHCP-related methods
 	def genNewXid(self):
@@ -524,7 +525,6 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		"""
 		print("==>Received ACK with content:")
 		print(packet.str())
-		#self.HelloSignal('<-ACK')
 		self._dhcp_status_mutex.acquire()
 		try:
 			if self._request_sent:
@@ -572,7 +572,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if self._apply_ip and self._ifname:
 			self.applyIpAddressFromDhcpLease()
 			self.applyDefaultGwFromDhcpLease()
-			self.IpConfigApplied(str(self._ifname), str(self._last_ipaddress), str(self._last_netmask), str(self._last_defaultgw))
+			self.IpConfigApplied(str(self._ifname), str(self._last_ipaddress), str(self._last_netmask), str(self._last_defaultgw), str(self._last_leasetime))
 			self.IpDnsReceived(dns_space_sep)
 	
 	def HandleDhcpAck(self, packet):
@@ -613,6 +613,8 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		self.handleDhcpNack(packet)
 
 
+dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)	# Use Glib's mainloop as the default loop for all subsequent code
+
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description="This program launches a DHCP client daemon. \
 It will report every DHCP client state change via D-Bus signal. \
@@ -622,11 +624,9 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 	parser.add_argument('-d', '--debug', action='store_true', help='display debug info')
 	args = parser.parse_args()
 	
-	dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)	# Use Glib's mainloop as the default loop for all subsequent code
-	loop = gobject.MainLoop()	# Get the gobject's main loop that will be used to process D-Bus messages
 	system_bus = dbus.SystemBus(private=True)
-	gobject.threads_init()	# Allow the mainloop to run as an independant thread
-	name = dbus.service.BusName(DBUS_NAME, system_bus)	# Grab a reference to the D-Bus interface we will use to send/receive on D-Bus
+	gobject.threads_init()	# Allow the mainloop to run as an independent thread
+	name = dbus.service.BusName(DBUS_NAME, system_bus)      # Publish the name to the D-Bus so that clients can see us
 	client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
 	client.setOnExit(exit)	# Tell the client to call exit() when it shuts down (this will allow direct program termination when receiving a D-Bus Exit() message instead of waiting on client.GetNextDhcpPacket() to timeout in the loop below
 	

@@ -122,7 +122,7 @@ def catchall_signal_handler(*args, **kwargs):
         print("        " + str(arg))
 
 
-class RemoteDhcpClient:
+class RemoteDhcpClientControl:
 
     """
     DHCP client object representing a remote (slave) DHCP client process
@@ -137,34 +137,34 @@ class RemoteDhcpClient:
 
     def __init__(self):
         """
-        Instanciate a new RemoteDhcpClient object that represents a DHCP client remotely-controlled via D-Bus
-        This RemoteDhcpClient object will mimic the status/methods of the remotely-controlled DHCP client so that we can interact with RemoteDhcpClient without any knowledge of the actual remotely-controller DHCP client
+        Instanciate a new RemoteDhcpClientControl object that represents a DHCP client remotely-controlled via D-Bus
+        This RemoteDhcpClientControl object will mimic the status/methods of the remotely-controlled DHCP client so that we can interact with RemoteDhcpClientControl without any knowledge of the actual remotely-controller DHCP client
         """
 
         self._dbus_loop = gobject.MainLoop()
         self._bus = dbus.SystemBus()
         wait_bus_owner_timeout = 5  # Wait for 5s to have an owner for the bus name we are expecting
-        logger.debug('Going to wait for an owner on bus name ' + RemoteDhcpClient.DBUS_NAME)
-        while not self._bus.name_has_owner(RemoteDhcpClient.DBUS_NAME):
+        logger.debug('Going to wait for an owner on bus name ' + RemoteDhcpClientControl.DBUS_NAME)
+        while not self._bus.name_has_owner(RemoteDhcpClientControl.DBUS_NAME):
             time.sleep(0.2)
             wait_bus_owner_timeout -= 0.2
             if wait_bus_owner_timeout <= 0: # We timeout without having an ower for the expected bus name
-                raise Exception('No owner found for bus name ' + RemoteDhcpClient.DBUS_NAME)
+                raise Exception('No owner found for bus name ' + RemoteDhcpClientControl.DBUS_NAME)
         
-        logger.debug('Got an owner for bus name ' + RemoteDhcpClient.DBUS_NAME)
+        logger.debug('Got an owner for bus name ' + RemoteDhcpClientControl.DBUS_NAME)
         gobject.threads_init()    # Allow the mainloop to run as an independent thread
         
-        self._dhcp_client_proxy = self._bus.get_object(RemoteDhcpClient.DBUS_SERVICE_INTERFACE, RemoteDhcpClient.DBUS_OBJECT_PATH)
-        self._dbus_iface = dbus.Interface(self._dhcp_client_proxy, RemoteDhcpClient.DBUS_SERVICE_INTERFACE)
+        self._dhcp_client_proxy = self._bus.get_object(RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE, RemoteDhcpClientControl.DBUS_OBJECT_PATH)
+        self._dbus_iface = dbus.Interface(self._dhcp_client_proxy, RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE)
         
         logger.debug("Connected to D-Bus")
         self._dhcp_client_proxy.connect_to_signal("IpConfigApplied",
                                                   self._handleIpConfigApplied,
-                                                  dbus_interface = RemoteDhcpClient.DBUS_SERVICE_INTERFACE,
+                                                  dbus_interface = RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE,
                                                   message_keyword='dbus_message')   # Handle the IpConfigApplied signal
         self._dhcp_client_proxy.connect_to_signal("IpDnsReceived",
                                                   self._handleIpDnsReceived,
-                                                  dbus_interface = RemoteDhcpClient.DBUS_SERVICE_INTERFACE,
+                                                  dbus_interface = RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE,
                                                   message_keyword='dbus_message')   # Handle the IpDnsReceived signal
         #Lionel: this is for D-Bus debugging only
         #self._bus.add_signal_receiver(catchall_signal_handler, interface_keyword='dbus_interface', member_keyword='member')
@@ -172,7 +172,7 @@ class RemoteDhcpClient:
         self._dbus_loop_thread.setDaemon(True)    # D-Bus loop should be forced to terminate when main program exits
         self._dbus_loop_thread.start()
         
-        self._bus.watch_name_owner(RemoteDhcpClient.DBUS_NAME, self._handleBusOwnerChanged) # Install a callback to run when the bus owner changes
+        self._bus.watch_name_owner(RemoteDhcpClientControl.DBUS_NAME, self._handleBusOwnerChanged) # Install a callback to run when the bus owner changes
         
         self._callback_new_lease_mutex = threading.Lock()    # This mutex protects writes to the _callback_new_lease attribute
         self._callback_new_lease = None
@@ -236,7 +236,7 @@ class RemoteDhcpClient:
         Callback called when our D-Bus bus owner changes 
         """
         if new_owner == '':
-            logger.warning('No owner anymore for bus name ' + RemoteDhcpClient.DBUS_NAME)
+            logger.warning('No owner anymore for bus name ' + RemoteDhcpClientControl.DBUS_NAME)
         else:
             pass # Owner exists
 
@@ -389,7 +389,7 @@ class DhcpClientLibrary:
         self._dhcp_client_daemon_exec_path = dhcp_client_daemon_exec_path
         self._ifname = ifname
         self._slave_dhcp_process = None
-        self._remote_dhcp_client = None    # Slave process not started
+        self._dhcp_client_ctrl = None    # Slave process not started
         self._new_lease_event = threading.Event() # At initialisation, event is cleared
         
     def start(self):
@@ -402,7 +402,7 @@ class DhcpClientLibrary:
         self._new_lease_event.clear()
         self._slave_dhcp_process = SlaveDhcpProcess(self._dhcp_client_daemon_exec_path, self._ifname)
         self._slave_dhcp_process.start()
-        self._remote_dhcp_client = RemoteDhcpClient()    # Create a RemoteDhcpClient object that symbolizes the control on the remote process (over D-Bus)
+        self._dhcp_client_ctrl = RemoteDhcpClientControl()    # Create a RemoteDhcpClientControl object that symbolizes the control on the remote process (over D-Bus)
         logger.debug('DHCP client started on ' + self._ifname)
         
     def stop(self):
@@ -412,8 +412,8 @@ class DhcpClientLibrary:
         | Stop |
         """
 
-        if not self._remote_dhcp_client is None:
-            self._remote_dhcp_client.exit()
+        if not self._dhcp_client_ctrl is None:
+            self._dhcp_client_ctrl.exit()
         if not self._slave_dhcp_process is None:
             self._slave_dhcp_process.kill()
         self._new_lease_event.clear()
@@ -441,9 +441,9 @@ class DhcpClientLibrary:
         | ${ip_address} |
         """
         
-        self._remote_dhcp_client.notifyNewLease(self._new_lease_event.clear)  # Ask underlying RemoteDhcpClient object to call self._new_lease_event.clear() as soon as we get a new lease 
+        self._dhcp_client_ctrl.notifyNewLease(self._new_lease_event.clear)  # Ask underlying RemoteDhcpClientControl object to call self._new_lease_event.clear() as soon as we get a new lease 
         self._new_lease_event.wait(timeout)
-        ipv4_address = self._remote_dhcp_client.getIpv4Address()
+        ipv4_address = self._dhcp_client_ctrl.getIpv4Address()
         if raise_exceptions and ipv4_address is None:
             raise Exception('DhcpLeaseTimeout')
         else:

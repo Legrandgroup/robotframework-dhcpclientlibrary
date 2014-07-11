@@ -311,15 +311,12 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		It will be stored inside the _current_xid property of this object and used in all subsequent DHCP packets sent by this object
 		It can be retrieved using getXid()
 		"""
-		self._dhcp_status_mutex.acquire()
-		try:
+		with self._dhcp_status_mutex:
 			if self._random is None:
 				self._random = random.Random()
 				self._random.seed()
 	
 			self._current_xid = self._random.randint(0,0xffffffff)
-		finally:
-			self._dhcp_status_mutex.release()
 	
 	def _getXitAsDhcpOption(self):
 		"""
@@ -340,11 +337,8 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		Set the transaction ID that will be used for all subsequent DHCP packets sent by us
 		We are expecting a 32-bit integer as argument xid
 		"""
-		self._dhcp_status_mutex.acquire()
-		try:
+		with self._dhcp_status_mutex:
 			self._current_xid = xid
-		finally:
-			self._dhcp_status_mutex.release()
 	
 	def getXid(self):
 		"""
@@ -405,9 +399,8 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_discover.SetOption('flags',[128, 0])
 		dhcp_discover_type = dhcp_discover.GetOption('dhcp_message_type')[0]
 		print("==>Sending DISCOVER")
-		self._dhcp_status_mutex.acquire()
-		self._request_sent = False
-		self._dhcp_status_mutex.release()
+		with self._dhcp_status_mutex:
+			self._request_sent = False
 		self.DhcpDiscoverSent()	# Emit DBUS signal
 		self.SendDhcpPacketTo(dhcp_discover, '255.255.255.255', self._server_port)
 	
@@ -464,9 +457,8 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_request_type = dhcp_request.GetOption('dhcp_message_type')[0]
 		print("==>Sending REQUEST")
 		self.DhcpRequestSent()	# Emit DBUS signal
-		self._dhcp_status_mutex.acquire()
-		self._request_sent = True
-		self._dhcp_status_mutex.release()
+		with self._dhcp_status_mutex:
+			self._request_sent = True
 		self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
 		
 	def sendDhcpRenew(self, ciaddr = None, dstipaddr = '255.255.255.255'):
@@ -501,9 +493,8 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_request_type = dhcp_request.GetOption('dhcp_message_type')[0]
 		print("==>Sending REQUEST (renewing lease)")
 		self.DhcpRenewSent()	# Emit DBUS signal
-		self._dhcp_status_mutex.acquire()
-		self._request_sent = True
-		self._dhcp_status_mutex.release()
+		with self._dhcp_status_mutex:
+			self._request_sent = True
 		self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
 		self._renew_thread = threading.Timer(self._last_leasetime / 6, self.sendDhcpRenew, [])	# After the first renew is sent, increase the frequency of the next renew packets
 		self._renew_thread.start()
@@ -539,19 +530,18 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 				dhcp_release_type = dhcp_release.GetOption('dhcp_message_type')[0]
 				print("==>Sending RELEASE")
 				self.DhcpReleaseSent('IP ' +str(self._last_ipaddress))	# Emit DBUS signal
-				self._dhcp_status_mutex.acquire()
-				self._request_sent = False
-				
-				self._last_ipaddress = None
-				self._last_netmask = None
-				self._last_defaultgw = None
-				self._last_dnsip_list = None
-				
-				self._last_serverid = None
-				self._last_leasetime = None
-				
-				self._lease_valid = False
-				self._dhcp_status_mutex.release()
+				with self._dhcp_status_mutex:
+					self._request_sent = False
+					
+					self._last_ipaddress = None
+					self._last_netmask = None
+					self._last_defaultgw = None
+					self._last_dnsip_list = None
+					
+					self._last_serverid = None
+					self._last_leasetime = None
+					
+					self._lease_valid = False
 
 				self.SendDhcpPacketTo(dhcp_release, '255.255.255.255', self._server_port)
 				
@@ -569,8 +559,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if self._dump_packets:
 			print(packet.str())
 		
-		self._dhcp_status_mutex.acquire()
-		try:
+		with self._dhcp_status_mutex:
 			if self._request_sent:
 				self._request_sent = False
 			else:
@@ -601,8 +590,6 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 				'DNS ' + dns_space_sep,
 				'SERVER ' + str(self._last_serverid),
 				'LEASETIME ' + str(self._last_leasetime))
-		finally:
-			self._dhcp_status_mutex.release()
 		
 		print('Starting renew thread')
 		if not self._renew_thread is None: self._renew_thread.cancel()	# Cancel the renew timeout
@@ -638,20 +625,17 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if self._dump_packets:
 			print(packet.str())
 
-		self._dhcp_status_mutex.acquire()
-
-		self._last_ipaddress = None
-		self._last_netmask = None
-		self._last_defaultgw = None
-		self._last_dnsip_list = []
-		
-		self._last_serverid = None
-		self._last_leasetime = None
-		self._lease_valid = False
-		
-		self._request_sent = False
-		
-		self._dhcp_status_mutex.release()
+		with self._dhcp_status_mutex:
+			self._last_ipaddress = None
+			self._last_netmask = None
+			self._last_defaultgw = None
+			self._last_dnsip_list = []
+			
+			self._last_serverid = None
+			self._last_leasetime = None
+			self._lease_valid = False
+			
+			self._request_sent = False
 		
 		raise Exception('DhcpNack')
 	

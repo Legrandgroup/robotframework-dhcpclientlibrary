@@ -8,6 +8,7 @@ from __future__ import print_function
 import os
 import sys
 import threading
+import atexit
 
 import gobject
 import dbus
@@ -19,10 +20,53 @@ import subprocess
 import signal
 
 
+all_processes_pid = []  # List of all subprocessed launched by us
 
-class DhcpClientStatus:
+def checkPid(pid):        
+    """
+    Check For the existence of a UNIX PID
+    """
+    
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    else:
+        return True
+    
+def killSubprocessFromPid(pid, log = True):
+    """
+    Kill a process from it PID (first send a SIGINT, then at give it a maximum of 1 second to terminate and send a SIGKILL if is still alive after this timeout
+    """
 
-    """ DHCP client state machine database """
+    if log: logger.info('Sending SIGINT to slave PID ' + str(pid))
+    args = ['sudo', 'kill', '-SIGINT', str(pid)]    # Send Ctrl+C to slave DHCP client process
+    subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+            
+    timeout = 1 # Give 1s for slave process to exit
+    while checkPid(pid):  # Loop if slave process is still running
+        time.sleep(0.1)
+        timeout -= 0.1
+        if timeout <= 0:    # We have reached timeout... send a SIGKILL to the slave process to force termination
+            if log: logger.info('Sending SIGKILL to slave PID ' + str(pid))
+            args = ['sudo', 'kill', '-SIGKILL', str(pid)]    # Send Ctrl+C to slave DHCP client process
+            subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+
+def cleanupAtExit():
+    """
+    Called when this program is terminated, to terminate all the subprocesses that are still running
+    """
+    
+    global all_processes_pid
+    
+    for pid in all_processes_pid: # list of your processes
+        logger.warning("Stopping slave PID " + str(pid))
+        killSubprocessFromPid(pid, log = False)
+
+class DhcpLeaseStatus:
+    """
+    This object represents a DHCP lease status database
+    """
 
     def __init__(self):
         self.ipv4_address = None
@@ -32,9 +76,9 @@ class DhcpClientStatus:
         self.ipv4_dhcpserverid = None
         self.ipv4_lease_valid = False   # Is the lease valid?
         self.ipv4_leaseduration = None  # How long the lease lasts
+        #self.ipv4_lease_remaining   # For how long the lease is still valid?
         self.ipv4_leaseexpiry = None    # When the lease will expire (in UTC time), as a time.struct_time object
-        self.ipv4_dhcpclientfailure = True
-        self.ipv4_dhcpclientnbfailure = 0
+        self._dhcp_status_mutex = threading.Lock()    # This mutex protects writes to any of the variables of this object
 
     def __repr__(self):
         temp = ''
@@ -56,7 +100,21 @@ class DhcpClientStatus:
             if not self.ipv4_leaseduration is None:
                 temp += 'IPv4 lease last for: ' + str(self.ipv4_leaseduration) + 's\n'
         return temp
-
+    
+    #===========================================================================
+    # @property
+    # def ipv4_lease_remaining(self):
+    #     return 0    # FIXME: we should perform some calculation here
+    # 
+    #  
+    # @flags.setter
+    # def ipv4_address(self, val):
+    #     self._dhcp_status_mutex.acquire()
+    #     try:
+    #         self.ipv4_address = val
+    #     finally:
+    #         self._dhcp_status_mutex.release()
+    #===========================================================================
 
 def catchall_signal_handler(*args, **kwargs):
     print("Caught signal (in catchall handler) " + kwargs['dbus_interface'] + "." + kwargs['member'])
@@ -66,7 +124,11 @@ def catchall_signal_handler(*args, **kwargs):
 
 class RemoteDhcpClient:
 
-    """ DHCP client object representing the remote DHCP client process with which we interface via D-Bus """
+    """
+    DHCP client object representing a remote (slave) DHCP client process
+    This slave process must already be running (we won't launch it ourselves)
+    Will will communicate with this slave using D-Bus Methods and catch the D-Bus signals it emits
+    """
 
     POLL_WAIT = 1 / 100
     DBUS_NAME = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'    # The name of bus we are connecting to on D-Bus
@@ -107,10 +169,16 @@ class RemoteDhcpClient:
         #Lionel: this is for D-Bus debugging only
         #self._bus.add_signal_receiver(catchall_signal_handler, interface_keyword='dbus_interface', member_keyword='member')
         self._dbus_loop_thread = threading.Thread(target = self._loopHandleDbus)    # Start handling D-Bus messages in a background thread
-        self._dbus_loop_thread.setDaemon(True)    # dbus loop should be forced to terminate when main program exits
+        self._dbus_loop_thread.setDaemon(True)    # D-Bus loop should be forced to terminate when main program exits
         self._dbus_loop_thread.start()
         
-        self.status = DhcpClientStatus()
+        self._bus.watch_name_owner(RemoteDhcpClient.DBUS_NAME, self._handleBusOwnerChanged) # Install a callback to run when the bus owner changes
+        
+        self._callback_new_lease_mutex = threading.Lock()    # This mutex protects writes to the _callback_new_lease attribute
+        self._callback_new_lease = None
+        
+        self.status_mutex = threading.Lock()    # This mutex protects writes to the status attribute
+        self.status = DhcpLeaseStatus()
         
     # D-Bus-related methods
     def _loopHandleDbus(self):
@@ -123,22 +191,60 @@ class RemoteDhcpClient:
         logger.debug("Stopping dbus mainloop")
         
     
+    def notifyNewLease(self, callback):
+        """
+        This method will call the specified callback when the lease becomes valid (or will call it immediately if it is already vali
+        callback must me callable or an exception will be raised
+        """
+        if not hasattr(callback, '__call__'):
+            raise Exception('WrongCallback')
+        else:
+            with self.status_mutex:
+                if self.status.ipv4_lease_valid:
+                    callback()  # Call callback function right now if lease is already valid
+                else:   # We still hold the mutex here because we don't want ipv4_lease_valid to be changed before we install the callback ;-)
+                    with self._callback_new_lease_mutex:
+                        self._callback_new_lease = callback
+    
     def _handleIpConfigApplied(self, interface, ip, netmask, defaultgw, leasetime, **kwargs):
-        self.status.ipv4_address = ip
-        self.status.ipv4_netmask = netmask
-        self.status.ipv4_defaultgw = defaultgw
-        self.status.ipv4_lease_valid = True
-        self.status.ipv4_leaseduration = leasetime
-        self.status.ipv4_leaseexpiry = datetime.datetime.now() + datetime.timedelta(seconds = int(leasetime))    # Calculate the time when the lease will expire
-        logger.debug('Lease obtained for IP: ' + ip + '. Will expire at ' + str(self.status.ipv4_leaseexpiry)) 
+        """
+        Method called when receiving the IpConfigApplied signal from the slave process
+        """
+        with self.status_mutex:
+            self.status.ipv4_address = ip
+            self.status.ipv4_netmask = netmask
+            self.status.ipv4_defaultgw = defaultgw
+            self.status.ipv4_lease_valid = True
+            self.status.ipv4_leaseduration = leasetime
+            self.status.ipv4_leaseexpiry = datetime.datetime.now() + datetime.timedelta(seconds = int(leasetime))    # Calculate the time when the lease will expire
+            logger.debug('Lease obtained for IP: ' + ip + '. Will expire at ' + str(self.status.ipv4_leaseexpiry))
+        with self._callback_new_lease_mutex:
+            if not self._callback_new_lease is None:    # If we have a callback to call when lease becomes valid
+                self._callback_new_lease()    # Do the callback
         # Lionel: FIXME: should start a timeout here to make the lease invalid at expiration 
-        
     
     def _handleIpDnsReceived(self, dns_space_sep_list, **kwargs):
-        self.status.ipv4_dnslist = dns_space_sep_list.split(' ')
-        logger.debug('Got DNS list: ' + str(self.status.ipv4_dnslist))
+        """
+        Method called when receiving the IpDnsReceived signal from the slave process
+        """
+        with self.status_mutex:
+            self.status.ipv4_dnslist = dns_space_sep_list.split(' ')
+            logger.debug('Got DNS list: ' + str(self.status.ipv4_dnslist))
         
+    def _handleBusOwnerChanged(self, new_owner):
+        """
+        Callback called when our D-Bus bus owner changes 
+        """
+        if new_owner == '':
+            logger.warning('No owner anymore for bus name ' + RemoteDhcpClient.DBUS_NAME)
+        else:
+            pass # Owner exists
+
+
     def _discard(self):
+        """
+        Empty callback used internally to discard D-Bus replies or errors
+        """
         logger.debug('Got called!')
         
     def exit(self):
@@ -155,117 +261,122 @@ class RemoteDhcpClient:
         logger.debug('Sending Exit() to remote DHCP client')
         self._dbus_iface.Exit(reply_handler = self._discard, error_handler = self._discard) # Call Exit() but ignore whether it gets acknowledged or not... this is because slave process may terminate before even acknowledge
 
-#===============================================================================
-#     def get_version(self):
-#         """ get version """
-# 
-#         if self._dbus_iface is None:
-#             raise Exception('You need to connect before getting version')
-#         else:
-#             version = self._dbus_iface.GetVersionString()
-#             return version
-# 
-#     def get_interface_name(self, interface_index):
-#         """ get interface name from index """
-# 
-#         if self._dbus_iface is None:
-#             raise Exception('You need to connect before getting interface name')
-#         else:
-#             interface_name = self._dbus_iface.GetNetworkInterfaceNameByIndex(interface_index)
-#             return interface_name
-# 
-#     def get_state(self):
-#         """ get state """
-# 
-#         if self._dbus_iface is None:
-#             raise Exception('The D-Bus-controlled DHCP client is not running. Please start it first')
-#         else:
-#             state = self._dbus_iface.GetState()
-#             return state
-# 
-#     def browse_service_type(self, stype):
-#         """ browse service """
-# 
-#         if self._dbus_iface is None:
-#             raise Exception('You need to connect before getting interface name')
-#         try:
-#             browser_path = self._dbus_iface.ServiceBrowserNew(avahi.IF_UNSPEC, avahi.PROTO_UNSPEC, stype, self._domain, dbus.UInt32(0))
-#             browser_proxy = self._bus.get_object(avahi.DBUS_NAME, browser_path)
-#             browser_interface = dbus.Interface(browser_proxy, avahi.DBUS_INTERFACE_SERVICE_BROWSER)
-#             browser_interface.connect_to_signal('AllForNow', self._service_finish)
-#             browser_interface.connect_to_signal('CacheExhausted', self._service_cache)
-#             browser_interface.connect_to_signal('Failure', self._service_failure)
-#             browser_interface.connect_to_signal('Free', self._service_free)
-#             browser_interface.connect_to_signal('ItemNew', self._service_new)
-#             browser_interface.connect_to_signal('ItemRemove', self._service_remove)
-#         except:
-#             raise Exception("DBus exception occurs in browse_service_type with type '%s' and value '%s'" % sys.exc_info()[:2])
-# 
-#     def _service_new(
-#         self,
-#         interface,
-#         protocol,
-#         name,
-#         stype,
-#         domain,
-#         flags,
-#         ):
-#         """ add a Bonjour service in database """
-# 
-#         logger.debug('Avahi:ItemNew')
-#         temp = self._dbus_iface.ResolveService(
-#             interface,
-#             protocol,
-#             name,
-#             stype,
-#             domain,
-#             avahi.PROTO_UNSPEC,
-#             dbus.UInt32(0),
-#             )
-#         self.service_database.add(temp)
-# 
-#     def _service_remove(
-#         self,
-#         interface,
-#         protocol,
-#         name,
-#         stype,
-#         domain,
-#         flags,
-#         ):
-#         """ remove a Bonjour service in database """
-# 
-#         logger.debug('Avahi:ItemRemove')
-#         key = (interface, protocol, name, stype, domain)
-#         self.service_database.remove(key)
-# 
-#     def _service_finish(self):
-#         """ no more Bonjour service """
-# 
-#         logger.debug('Avahi:AllForNow')
-#         self._loop.quit()
-# 
-#     def _service_failure(self, error):
-#         """ avahi failure """
-# 
-#         logger.debug('Avahi:Failure')
-#         logger.warn('Error %s' % error)
-#         self._loop.quit()
-# 
-#     @staticmethod
-#     def _service_free():
-#         """ free """
-# 
-#         logger.debug('Avahi:Free')
-# 
-#     @staticmethod
-#     def _service_cache():
-#         """ cache """
-# 
-#         logger.debug('Avahi:CacheExhausted')
-#===============================================================================
+    def getIpv4Address(self):
+        """
+        Get the current IPv4 address obtained by the DHCP client or None if we have no valid lease
+        Returns it as string containing a dotted-decimal IPv4 address
+        """
+        with self.status_mutex:
+            if self.status.ipv4_lease_valid is None:
+                return None
+            else:
+                return self.status.ipv4_address
+    
+    def getIpv4Netmask(self):
+        """
+        Get the current IPv4 netmask obtained by the DHCP client or None if we have no valid lease
+        Returns it as string containing a dotted-decimal IPv4 address
+        """
+        with self.status_mutex:
+            if self.status.ipv4_lease_valid is None:
+                return None
+            else:
+                return self.status.ipv4_netmask
+            
+    def getIpv4DefaultGateway(self):
+        """
+        Get the current IPv4 default gateway obtained by the DHCP client or None if we have no valid lease
+        Returns it as string containing a dotted-decimal IPv4 address
+        """
+        with self.status_mutex:
+            if self.status.ipv4_lease_valid is None:
+                return None
+            else:
+                return self.status.ipv4_defaultgw
 
+    def getIpv4DnsList(self):
+        """
+        Get the current list of IPv4 DNS obtained by the DHCP client or [None] if we have no valid lease
+        Returns it as list of strings, each containing a dotted-decimal IPv4 address for each DNS server
+        """
+        with self.status_mutex:
+            if self.status.ipv4_lease_valid is None:
+                return [None]
+            else:
+                return self.status.ipv4_dnslist
+                
 
+class SlaveDhcpProcess:
+    """
+    Slave DHCP client process manipulation
+    This class allows to run a DHCP client subprocess as root, and to terminate it
+    dhcp_client_daemon_exec_path contains the name of the executable that implements the DHCP client
+    ifname is the name of the network interface on which the DHCP client will run
+    if log is set to False, no logging will be performed on the logger object 
+    """
+    
+    def __init__(self, dhcp_client_daemon_exec_path, ifname, log = True):
+        self._slave_dhcp_client_path = dhcp_client_daemon_exec_path
+        self._slave_dhcp_client_proc = None
+        self._slave_dhcp_client_pid = None
+        self._ifname = ifname
+        self._log = log
+    
+    def start(self):
+        """
+        Start the slave process
+        """
+        try:
+            global all_processes_pid
+            cmd = ['sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A']
+            logger.debug('Running command ' + str(cmd))
+            self._slave_dhcp_client_proc = subprocess.Popen(cmd)#, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+            self._slave_dhcp_client_pid = self._slave_dhcp_client_proc.pid
+            all_processes_pid += [self._slave_dhcp_client_proc.pid]
+        except:
+            raise   # Reraise exception exception handling
+    
+    def kill(self):
+        """
+        Stop the slave process
+        """
+        if not self.isRunning():
+            if self._log: logger.debug('Slave PID ' + str(self._slave_dhcp_client_pid) + ' has already terminated')
+        else:
+            kill_subprocess_from_pid(self._slave_dhcp_client_pid)
+            if self._log: logger.info('Sending SIGINT to slave PID ' + str(self._slave_dhcp_client_pid))
+            args = ['sudo', 'kill', '-SIGINT', str(self._slave_dhcp_client_pid)]    # Send Ctrl+C to slave DHCP client process
+            subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+            
+            timeout = 10 # Give 10/10s for slave process to exit
+            while self.isRunning():  # Loop if slave process is still running
+                time.sleep(0.1)
+                timeout -= 1
+                if timeout <= 0:    # We have reached timeout... send a SIGKILL to the slave process to force termination
+                    if self._log: logger.info('Sending SIGKILL to slave PID ' + str(self._slave_dhcp_client_pid))
+                    args = ['sudo', 'kill', '-SIGKILL', str(self._slave_dhcp_client_pid)]    # Send Ctrl+C to slave DHCP client process
+                    subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+            
+            self._slave_dhcp_client_proc.wait()
+        
+        self._slave_dhcp_client_pid = None    
+        self._slave_dhcp_client_proc = None
+
+    def isRunning(self):
+        """
+        Is the child process currently running 
+        """
+        if not self.hasBeenStarted():
+            return False
+        
+        return self._slave_dhcp_client_proc.poll()
+    
+    def hasBeenStarted(self):
+        """
+        Has the child process been started by us
+        """
+        return (not self._slave_dhcp_client_pid is None) and (not self._slave_dhcp_client_proc is None)
+        
 class DhcpClientLibrary:
 
     """ Robot Framework Bonjour Library """
@@ -275,22 +386,12 @@ class DhcpClientLibrary:
     ROBOT_LIBRARY_VERSION = '1.0'
 
     def __init__(self, dhcp_client_daemon_exec_path, ifname):
-        self._remote_dhcp_client = None    # Slave process not started
-        self._slave_dhcp_client_path = dhcp_client_daemon_exec_path
-        self._slave_dhcp_client_proc = None
-        self._slave_dhcp_client_pid = None
+        self._dhcp_client_daemon_exec_path = dhcp_client_daemon_exec_path
         self._ifname = ifname
+        self._slave_dhcp_process = None
+        self._remote_dhcp_client = None    # Slave process not started
+        self._new_lease_event = threading.Event() # At initialisation, event is cleared
         
-    def _reconnect(self):
-        """
-        Lionel: FIXME: what does the following comment from Tristan means?
-        reconnect can connect if debug was stop or restarted and flush ingoing message
-        """
-
-        self._remote_dhcp_client.disconnect()
-        self._remote_dhcp_client.connect()
-
-
     def start(self):
         """Start the DHCP client
         
@@ -298,27 +399,11 @@ class DhcpClientLibrary:
         | Start |
         """
         
-        try:
-            cmd = ['sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A']
-            logger.debug('Running command ' + str(cmd))
-            self._slave_dhcp_client_proc = subprocess.Popen(cmd)#, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-            self._slave_dhcp_client_pid = self._slave_dhcp_client_proc.pid
-            #time.sleep(1)   # Wait until child registers to D-Bus
-        except:
-            raise   # No exception handling for now
+        self._new_lease_event.clear()
+        self._slave_dhcp_process = SlaveDhcpProcess(self._dhcp_client_daemon_exec_path, self._ifname)
+        self._slave_dhcp_process.start()
         self._remote_dhcp_client = RemoteDhcpClient()    # Create a RemoteDhcpClient object that symbolizes the control on the remote process (over D-Bus)
-        logger.debug("Now connected to D-Bus")
-        
-#===============================================================================
-# If we want to be notified when child exists and releases the bus, we can use:
-#         def rhythmbox_owner_changed(new_owner):
-#             if new_owner == '':
-#                 print 'Rhythmbox is no longer running'
-#             else:
-#                 print 'Rhythmbox is now running'
-# 
-#             bus.watch_name_owner('org.gnome.Rhythmbox')
-#===============================================================================
+        logger.debug('DHCP client started on ' + self._ifname)
         
     def stop(self):
         """ Stop the DHCP client
@@ -327,21 +412,12 @@ class DhcpClientLibrary:
         | Stop |
         """
 
-        if not self._slave_dhcp_client_proc is None:
-            if not self._remote_dhcp_client is None:
-                self._remote_dhcp_client.exit()
-            
-            if not self._slave_dhcp_client_pid is None:
-                print('Sending SIGINT to child')
-                if not self._slave_dhcp_client_proc.poll():
-                    print('Child has already terminated')
-                else:
-                    args = ['sudo', 'kill', '-SIGINT', str(self._slave_dhcp_client_pid)]    # Send Ctrl+C to slave DHCP client process
-                    subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-                    # Lionel: FIXME: we should check if slave process terminates or not within 1s else send a SIGKILL
-                    self._slave_dhcp_client_pid = None
-                    self._slave_dhcp_client_proc.wait()
-            self._slave_dhcp_client_proc = None
+        if not self._remote_dhcp_client is None:
+            self._remote_dhcp_client.exit()
+        if not self._slave_dhcp_process is None:
+            self._slave_dhcp_process.kill()
+        self._new_lease_event.clear()
+        logger.debug('DHCP client stopped on ' + self._ifname)
     
     def restart(self):
         """ Restart the DHCP client
@@ -351,84 +427,34 @@ class DhcpClientLibrary:
         """
 
         self.stop()
-        self.start()
-        self._remote_dhcp_client.connect()
+        self.start()    
+    
+    def wait_lease(self, timeout = None, raise_exceptions = True):
+        """ Wait until we get a new lease (until timeout if specified)
+        DHCP client starts as soon as Start keyword is called, so a lease may already be obtained when running keyword Wait Lease
+        
+        Return the IP address obtained
+        
+        Example:
+        | Wait Lease |
+        =>
+        | ${ip_address} |
+        """
+        
+        self._remote_dhcp_client.notifyNewLease(self._new_lease_event.clear)  # Ask underlying RemoteDhcpClient object to call self._new_lease_event.clear() as soon as we get a new lease 
+        self._new_lease_event.wait(timeout)
+        ipv4_address = self._remote_dhcp_client.getIpv4Address()
+        if raise_exceptions and ipv4_address is None:
+            raise Exception('DhcpLeaseTimeout')
+        else:
+            return unicode(ipv4_address)
 
 
-#===============================================================================
-#     def check_run(self, address, stype='_http._tcp'):
-#         """ Test if service type `stype` is present on `address`.
-#         
-#         Return service.
-#         
-#         Example:
-#         | Check Run | ip | _http._tcp |
-#         =>
-#         | ${service} |
-#         """
-# 
-#         self._browse_generic(stype)
-#         temp = self._remote_dhcp_client.service_database.get_key_from_address(address)
-#         if temp is not None:
-#             ret = temp
-#         else:
-#             raise Exception("Service '%s' expected on '%s'" % (stype, address))
-#         return ret
-# 
-#     def check_stop(self, address, stype='_http._tcp'):
-#         """ Test if service type `stype` is missing on `address`.
-#         
-#         Return service.
-#         
-#         Example:
-#         | Check Stop | ip | _http._tcp |
-#         """
-# 
-#         self._browse_generic(stype)
-#         temp = self._remote_dhcp_client.service_database.get_key_from_address(address)
-#         if temp is not None:
-#             raise Exception("Service '%s' not expected on '%s'" % (stype, address))
-# 
-#     def get_ip(self, mac, stype='_http._tcp'):
-#         """ Get first ip address which have service type `stype` and `mac`.
-#         
-#         Return IP.
-#         
-#         Example:
-#         | Get IP | 01.23.45.67.89.ab | _http._tcp |
-#         =>
-#         | ip |
-#         """
-# 
-#         self._browse_generic(stype)
-#         temp = self._remote_dhcp_client.service_database.get_address_from_mac(mac)
-#         if temp is not None:
-#             ret = temp
-#         else:
-#             raise Exception("Service '%s' expected on '%s'" % (stype, mac))
-#         ret = unicode(ret)
-#         return ret
-# 
-#     def get_apname(self, key):
-#         """ Get Application Point name from `key`.
-#         
-#         Return IP.
-#         
-#         Example:
-#         | ${data} = | Check Run | ip | _http._tcp |
-#         | Get APName | ${data} |
-#         =>
-#         | ${apname} |
-#         """
-# 
-#         ret = self._remote_dhcp_client.service_database.get_info_from_key(key)[0]
-#         ret = unicode(ret)
-#         return ret
-#===============================================================================
 
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)    # Use Glib's mainloop as the default loop for all subsequent code
 
 if __name__ == '__main__':
+    atexit.register(cleanupAtExit)
     try:
         from console_logger import LOGGER as logger
     except ImportError:
@@ -456,6 +482,9 @@ if __name__ == '__main__':
     
     client = DhcpClientLibrary(DHCP_CLIENT_DAEMON, 'eth1')
     client.start()
+    print("Waiting 10s to get a DHCP lease")
+    ip_addr = client.wait_lease(10)
+    print("Got a lease with IP address " + ip_addr)
     input('Press enter to stop slave')
     client.stop()
     #assert IP == client.get_ip(MAC, '_http._tcp')

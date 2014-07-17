@@ -22,6 +22,8 @@ import MacAddr
 import threading
 import time
 
+import lockfile
+
 sys.path.insert(0, '/opt/python-local/lib/python2.7/site-packages/')
 
 from pydhcplib.dhcp_packet import *
@@ -661,12 +663,23 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 	system_bus = dbus.SystemBus(private=True)
 	gobject.threads_init()	# Allow the mainloop to run as an independent thread
 	name = dbus.service.BusName(DBUS_NAME, system_bus)      # Publish the name to the D-Bus so that clients can see us
-	client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
-	client.setOnExit(exit)	# Tell the client to call exit() when it shuts down (this will allow direct program termination when receiving a D-Bus Exit() message instead of waiting on client.GetNextDhcpPacket() to timeout in the loop below
 	
-	client.sendDhcpDiscover()	# Send a DHCP DISCOVER on the network
-	
+	lockfilename = '/var/lock/' + progname + '.' + args.ifname
+	lock = lockfile.FileLock(lockfilename)
 	try:
-		while True:	client.GetNextDhcpPacket()	# Handle incoming DHCP packets
+		lock.acquire(timeout = 0)
+	
+		client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
+		client.setOnExit(exit)	# Tell the client to call exit() when it shuts down (this will allow direct program termination when receiving a D-Bus Exit() message instead of waiting on client.GetNextDhcpPacket() to timeout in the loop below
+		
+		client.sendDhcpDiscover()	# Send a DHCP DISCOVER on the network
+		
+		try:
+			while True:	client.GetNextDhcpPacket()	# Handle incoming DHCP packets
+		finally:
+			client.exit()
+	except lockfile.AlreadyLocked:
+		print(progname + ": Error: Could not get lock on file " + lockfilename)
 	finally:
-		client.exit()
+		if lock and lock.i_am_locking():
+				lock.release()

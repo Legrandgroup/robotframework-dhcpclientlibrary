@@ -679,7 +679,7 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 		finally:
 			client.exit()
 	except lockfile.AlreadyLocked:
-		print(progname + ": Error: Could not get lock on file " + lockfilename)
+		print(progname + ': Error: Could not get lock on file ' + lockfilename + '.lock')
 	finally:
 		if lock and lock.i_am_locking():
 				lock.release()

@@ -51,6 +51,7 @@ def killSubprocessFromPid(pid, log = True):
             if log: logger.info('Sending SIGKILL to slave PID ' + str(pid))
             args = ['sudo', 'kill', '-SIGKILL', str(pid)]    # Send Ctrl+C to slave DHCP client process
             subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+            break
 
 def cleanupAtExit():
     """
@@ -379,19 +380,49 @@ class SlaveDhcpProcess:
         
 class DhcpClientLibrary:
 
-    """ Robot Framework Bonjour Library """
+    """ Robot Framework DHCP client Library """
 
     ROBOT_LIBRARY_DOC_FORMAT = 'ROBOT'
     ROBOT_LIBRARY_SCOPE = 'GLOBAL'
     ROBOT_LIBRARY_VERSION = '1.0'
 
-    def __init__(self, dhcp_client_daemon_exec_path, ifname):
+    def __init__(self, dhcp_client_daemon_exec_path, ifname = None):
+        """Initialise the library
+        dhcp_client_daemon_exec_path is a PATH to the executable program that run the D-Bus controlled DHCP client (will be run as root via sudo)
+        ifname is the interface on which we will act as a DHCP client. If not provided, it will be mandatory to set it using Set Interface and before running Start
+        """
         self._dhcp_client_daemon_exec_path = dhcp_client_daemon_exec_path
         self._ifname = ifname
         self._slave_dhcp_process = None
         self._dhcp_client_ctrl = None    # Slave process not started
         self._new_lease_event = threading.Event() # At initialisation, event is cleared
         
+    def set_interface(self, ifname):
+        """Set the interface on which the DHCP client will act
+        This must be done prior to calling Start on the DHCP client
+        
+        Example:
+        | Set Interface | 'eth0' |
+        """
+        
+        if not self._slave_dhcp_process is None:
+            raise Exception('DhcpClientAlreadyStarted')
+        
+        self._ifname = ifname
+        
+    def get_interface(self, ifname):
+        """Get the interface on which the DHCP client is configured to run (it may not be started yet)
+        Will return None if no interface has been configured yet
+        
+        Example:
+        | Set Interface | 'eth0' |
+        | Get Interface |
+        =>
+        | 'eth0' |
+        """
+        
+        return self._ifname
+
     def start(self):
         """Start the DHCP client
         
@@ -399,6 +430,8 @@ class DhcpClientLibrary:
         | Start |
         """
         
+        if self._ifname is None:
+            raise Exception('NoInterfaceProvided')
         self._new_lease_event.clear()
         self._slave_dhcp_process = SlaveDhcpProcess(self._dhcp_client_daemon_exec_path, self._ifname)
         self._slave_dhcp_process.start()
@@ -417,6 +450,7 @@ class DhcpClientLibrary:
         if not self._slave_dhcp_process is None:
             self._slave_dhcp_process.kill()
         self._new_lease_event.clear()
+        self._slave_dhcp_process = None # Destroy the slave DHCP object
         logger.debug('DHCP client stopped on ' + self._ifname)
     
     def restart(self):

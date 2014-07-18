@@ -657,6 +657,7 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 	parser.add_argument('-i', '--ifname', type=str, help='network interface on which to send/receive DHCP packets', required=True)
 	parser.add_argument('-A', '--applyconfig', action='store_true', help='apply the IP config (ip address, netmask and default gateway) to the interface when lease is obtained')
 	parser.add_argument('-D', '--dumppackets', action='store_true', help='dump received packets content', default=False)
+	parser.add_argument('-S', '--startondbus', action='store_true', help='only start the DHCP client when receiving a D-Bus Discover() method', default=False)
 	parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
 	args = parser.parse_args()
 	
@@ -672,7 +673,8 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 		client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
 		client.setOnExit(exit)	# Tell the client to call exit() when it shuts down (this will allow direct program termination when receiving a D-Bus Exit() message instead of waiting on client.GetNextDhcpPacket() to timeout in the loop below
 		
-		client.sendDhcpDiscover()	# Send a DHCP DISCOVER on the network
+		if not args.startondbus:
+			client.sendDhcpDiscover()	# Send a DHCP DISCOVER on the network
 		
 		try:
 			while True:	client.GetNextDhcpPacket()	# Handle incoming DHCP packets

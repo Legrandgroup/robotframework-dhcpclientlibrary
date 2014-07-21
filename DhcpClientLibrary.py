@@ -41,7 +41,7 @@ def killSubprocessFromPid(pid, log = True):
 
     if log: logger.info('Sending SIGINT to slave PID ' + str(pid))
     args = ['sudo', 'kill', '-SIGINT', str(pid)]    # Send Ctrl+C to slave DHCP client process
-    subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+    subprocess.call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
             
     timeout = 1 # Give 1s for slave process to exit
     while checkPid(pid):  # Loop if slave process is still running
@@ -50,7 +50,7 @@ def killSubprocessFromPid(pid, log = True):
         if timeout <= 0:    # We have reached timeout... send a SIGKILL to the slave process to force termination
             if log: logger.info('Sending SIGKILL to slave PID ' + str(pid))
             args = ['sudo', 'kill', '-SIGKILL', str(pid)]    # Send Ctrl+C to slave DHCP client process
-            subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+            subprocess.call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
             break
 
 def cleanupAtExit():
@@ -178,6 +178,8 @@ class RemoteDhcpClientControl:
         self._callback_new_lease_mutex = threading.Lock()    # This mutex protects writes to the _callback_new_lease attribute
         self._callback_new_lease = None
         
+        self._exit_unlock_event = threading.Event() # Create a new threading event that will allow the exit() method to wait for the child to terminate properly
+
         self.status_mutex = threading.Lock()    # This mutex protects writes to the status attribute
         self.status = DhcpLeaseStatus()
         
@@ -221,7 +223,9 @@ class RemoteDhcpClientControl:
             logger.debug('Lease obtained for IP: ' + ip + '. Will expire at ' + str(self.status.ipv4_leaseexpiry))
         with self._callback_new_lease_mutex:
             if not self._callback_new_lease is None:    # If we have a callback to call when lease becomes valid
+                logger.debug('Calling callback for new lease')
                 self._callback_new_lease()    # Do the callback
+
         # Lionel: FIXME: should start a timeout here to make the lease invalid at expiration 
     
     def _handleIpDnsReceived(self, dns_space_sep_list, **kwargs):
@@ -242,11 +246,12 @@ class RemoteDhcpClientControl:
             pass # Owner exists
 
 
-    def _discard(self):
+    def _exitUnlock(self):
         """
-        Empty callback used internally to discard D-Bus replies or errors
+        Callback used internally to unlock a timeout on exit
         """
-        logger.debug('Got called!')
+        logger.debug('Unlocking exit()')
+        self._exit_unlock_event.set()
         
     def exit(self):
         """
@@ -260,8 +265,10 @@ class RemoteDhcpClientControl:
             raise Exception('Method invoked on non existing D-Bus interface')
         
         logger.debug('Sending Exit() to remote DHCP client')
-        self._dbus_iface.Exit(reply_handler = self._discard, error_handler = self._discard) # Call Exit() but ignore whether it gets acknowledged or not... this is because slave process may terminate before even acknowledge
-
+        self._exit_unlock_event.clear()
+        self._dbus_iface.Exit(reply_handler = self._exitUnlock, error_handler = self._exitUnlock) # Call Exit() but ignore whether it gets acknowledged or not... this is because slave process may terminate before even acknowledge
+        self._exit_unlock_event.wait(timeout = 5) # Give 5s for slave to acknowledge the Exit() D-Bus method call... otherwise, ignore and continue
+    
     def sendDiscover(self):
         logger.info('Instructing slave to send DISCOVER')
         self._dbus_iface.Discover() # Ask slave process to send a DHCP discover
@@ -332,7 +339,7 @@ class SlaveDhcpProcess:
         Start the slave process
         """
         try:
-            global all_processes_pid
+            global all_processes_pid    # This process's list of child PIDs (global variable)
             cmd = ['sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A', '-S']
             logger.debug('Running command ' + str(cmd))
             self._slave_dhcp_client_proc = subprocess.Popen(cmd)#, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
@@ -345,23 +352,12 @@ class SlaveDhcpProcess:
         """
         Stop the slave process
         """
+        global all_processes_pid    # This process's list of child PIDs (global variable)
         if not self.isRunning():
             if self._log: logger.debug('Slave PID ' + str(self._slave_dhcp_client_pid) + ' has already terminated')
+            while self._slave_dhcp_client_pid in all_processes_pid: all_processes_pid.remove(self._slave_dhcp_client_pid)   # Remove references to this child's PID in the list of children
         else:
-            kill_subprocess_from_pid(self._slave_dhcp_client_pid)
-            if self._log: logger.info('Sending SIGINT to slave PID ' + str(self._slave_dhcp_client_pid))
-            args = ['sudo', 'kill', '-SIGINT', str(self._slave_dhcp_client_pid)]    # Send Ctrl+C to slave DHCP client process
-            subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-            
-            timeout = 10 # Give 10/10s for slave process to exit
-            while self.isRunning():  # Loop if slave process is still running
-                time.sleep(0.1)
-                timeout -= 1
-                if timeout <= 0:    # We have reached timeout... send a SIGKILL to the slave process to force termination
-                    if self._log: logger.info('Sending SIGKILL to slave PID ' + str(self._slave_dhcp_client_pid))
-                    args = ['sudo', 'kill', '-SIGKILL', str(self._slave_dhcp_client_pid)]    # Send Ctrl+C to slave DHCP client process
-                    subprocess.check_call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-            
+            killSubprocessFromPid(self._slave_dhcp_client_pid)
             self._slave_dhcp_client_proc.wait()
         
         self._slave_dhcp_client_pid = None    

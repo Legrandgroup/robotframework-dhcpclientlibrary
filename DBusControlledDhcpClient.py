@@ -354,19 +354,18 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		Warning, we will not modify the current lease information stored in this object however
 		"""
 		if self._iface_modified:	# Clean up our ip configuration (revert to standard config for this interface)
-			if not self._ifname:
-				raise Exception('NoIfaceProvidedWithApplyIP')
-			cmdline = ['ifdown', str(self._ifname)]
-			print(cmdline)
-			subprocess.call(cmdline)
-			time.sleep(0.2)	# Grrrr... on some implementations, ifdown returns too early (before actually doing its job)
-			cmdline = ['ifconfig', str(self._ifname), '0.0.0.0', 'down']	# Make sure we get rid of the IP address
-			print(cmdline)
-			subprocess.call(cmdline)
-			cmdline = ['ifup', str(self._ifname)]
-			print(cmdline)
-			subprocess.call(cmdline)
-			self._iface_modified = False
+			if self._ifname:
+				cmdline = ['ifdown', str(self._ifname)]
+				print(cmdline)
+				subprocess.call(cmdline)
+				time.sleep(0.2)	# Grrrr... on some implementations, ifdown returns too early (before actually doing its job)
+				cmdline = ['ifconfig', str(self._ifname), '0.0.0.0', 'down']	# Make sure we get rid of the IP address
+				print(cmdline)
+				subprocess.call(cmdline)
+				cmdline = ['ifup', str(self._ifname)]
+				print(cmdline)
+				subprocess.call(cmdline)
+				self._iface_modified = False
 
 	def sendDhcpDiscover(self, parameter_list = None, release = True):
 		"""

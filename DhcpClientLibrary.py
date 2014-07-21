@@ -262,6 +262,10 @@ class RemoteDhcpClientControl:
         logger.debug('Sending Exit() to remote DHCP client')
         self._dbus_iface.Exit(reply_handler = self._discard, error_handler = self._discard) # Call Exit() but ignore whether it gets acknowledged or not... this is because slave process may terminate before even acknowledge
 
+    def sendDiscover(self):
+        logger.info('Instructing slave to send DISCOVER')
+        self._dbus_iface.Discover() # Ask slave process to send a DHCP discover
+    
     def getIpv4Address(self):
         """
         Get the current IPv4 address obtained by the DHCP client or None if we have no valid lease
@@ -329,7 +333,7 @@ class SlaveDhcpProcess:
         """
         try:
             global all_processes_pid
-            cmd = ['sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A']
+            cmd = ['sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A', '-S']
             logger.debug('Running command ' + str(cmd))
             self._slave_dhcp_client_proc = subprocess.Popen(cmd)#, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
             self._slave_dhcp_client_pid = self._slave_dhcp_client_proc.pid
@@ -437,6 +441,7 @@ class DhcpClientLibrary:
         self._slave_dhcp_process.start()
         self._dhcp_client_ctrl = RemoteDhcpClientControl()    # Create a RemoteDhcpClientControl object that symbolizes the control on the remote process (over D-Bus)
         logger.debug('DHCP client started on ' + self._ifname)
+        self._dhcp_client_ctrl.sendDiscover()
         
     def stop(self):
         """ Stop the DHCP client

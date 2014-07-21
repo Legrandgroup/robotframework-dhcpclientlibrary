@@ -677,6 +677,8 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 	
 	system_bus = dbus.SystemBus(private=True)
 	gobject.threads_init()	# Allow the mainloop to run as an independent thread
+	dbus.mainloop.glib.threads_init()
+	
 	name = dbus.service.BusName(DBUS_NAME, system_bus)      # Publish the name to the D-Bus so that clients can see us
 	
 	lockfilename = '/var/lock/' + progname + '.' + args.ifname

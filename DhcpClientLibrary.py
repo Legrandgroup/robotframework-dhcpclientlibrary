@@ -201,11 +201,20 @@ class RemoteDhcpClientControl:
         
     
     def _getVersionUnlock(self, return_value):
+        """
+        This method is used as a callback for asynchronous D-Bus method call to GetVersion()
+        It is run as a reply_handler to unlock the wait() on _getversion_unlock_event
+        """
+        #logger.debug('_getVersionUnlock() called')
         self._remote_version = str(return_value)
         self._getversion_unlock_event.set() # Unlock the wait() on self._getversion_unlock_event
         
     def _getVersionError(self, remote_exception):
-        logger.error('Error on invocaiton of GetVersion() to slave, via D-Bus')
+        """
+        This method is used as a callback for asynchronous D-Bus method call to GetVersion()
+        It is run as an error_handler to raise an exception when the call to GetVersion() failed
+        """
+        logger.error('Error on invocation of GetVersion() to slave, via D-Bus')
         raise Exception('ErrorOnDBusGetVersion')
         
     def notifyNewLease(self, callback):
@@ -241,7 +250,6 @@ class RemoteDhcpClientControl:
                 logger.debug('Got DNS list: ' + str(self.status.ipv4_dnslist))
         with self._callback_new_lease_mutex:
             if not self._callback_new_lease is None:    # If we have a callback to call when lease becomes valid
-                logger.debug('Calling callback for new lease')
                 self._callback_new_lease()    # Do the callback
 
         # Lionel: FIXME: should start a timeout here to make the lease invalid at expiration 
@@ -442,10 +450,11 @@ class DhcpClientLibrary:
         
         if self._ifname is None:
             raise Exception('NoInterfaceProvided')
-        self._new_lease_event.clear()
         self._slave_dhcp_process = SlaveDhcpProcess(self._dhcp_client_daemon_exec_path, self._ifname)
         self._slave_dhcp_process.start()
+        self._new_lease_event.clear()
         self._dhcp_client_ctrl = RemoteDhcpClientControl()    # Create a RemoteDhcpClientControl object that symbolizes the control on the remote process (over D-Bus)
+        self._dhcp_client_ctrl.notifyNewLease(self._got_new_lease)  # Ask underlying RemoteDhcpClientControl object to call self._new_lease_retrieved() as soon as we get a new lease 
         logger.debug('DHCP client started on ' + self._ifname)
         self._dhcp_client_ctrl.sendDiscover()
         
@@ -474,6 +483,12 @@ class DhcpClientLibrary:
         self.stop()
         self.start()    
     
+    def _got_new_lease(self):
+        """
+        Internal callback invoked when a new lease is allocated to the slave DHCP client
+        """
+        self._new_lease_event.set()
+        
     def wait_lease(self, timeout = None, raise_exceptions = True):
         """ Wait until we get a new lease (until timeout if specified)
         DHCP client starts as soon as Start keyword is called, so a lease may already be obtained when running keyword Wait Lease
@@ -486,8 +501,7 @@ class DhcpClientLibrary:
         | ${ip_address} |
         """
         
-        self._dhcp_client_ctrl.notifyNewLease(self._new_lease_event.clear)  # Ask underlying RemoteDhcpClientControl object to call self._new_lease_event.clear() as soon as we get a new lease 
-        self._new_lease_event.wait(float(timeout))
+        self._new_lease_event.wait(timeout = float(timeout))
         ipv4_address = self._dhcp_client_ctrl.getIpv4Address()
         if raise_exceptions and ipv4_address is None:
             raise Exception('DhcpLeaseTimeout')

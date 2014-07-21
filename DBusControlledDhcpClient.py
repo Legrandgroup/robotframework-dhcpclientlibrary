@@ -33,6 +33,8 @@ progname = os.path.basename(sys.argv[0])
 
 #import pyiface	# Commented-out... for now we are using the system's userspace tools (ifconfig, route etc...)
 
+VERSION = '1.0.0'
+
 # DHCP types names array (index is the DHCP type)
 DHCP_TYPES = ['UNKNOWN',
 	'DISCOVER', # 1
@@ -274,6 +276,16 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if not self._renew_thread is None: self._renew_thread.cancel()	# Cancel the renew timeout
 		if not self._release_thread is None: self._release_thread.cancel()	# Cancel the release timeout
 	
+	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='s')
+	def GetVersion(self):
+		"""
+		D-Bus decorated method executed when receiving the D-Bus "GetVersion" message call
+		This method will return the version of this program.
+		It can also be used to make sure that this process is running (as a heartbeat or ping)
+		"""
+		global VERSION
+		return VERSION
+	
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='s', out_signature='')
 	def Debug(self, msg):
 		"""
@@ -471,6 +483,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 			self._renew_thread.cancel()
 			self._renew_thread = None
 		
+		self.genNewXid()	# Generate a new transaction
 		dhcp_request = DhcpPacket()
 		dhcp_request.SetOption('op', [1])
 		dhcp_request.SetOption('htype', [1])
@@ -512,6 +525,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 			self._renew_thread = None	# Delete pointer to the renew (we have lost our lease)
 			
 			if not self._last_ipaddress is None:	# Do we have a lease?
+				self.genNewXid()
 				dhcp_release = DhcpPacket()
 				dhcp_release.SetOption('op', [1])
 				dhcp_release.SetOption('htype', [1])
@@ -602,6 +616,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		self._release_thread.start()
 		
 		if self._apply_ip and self._ifname:
+			#print('Applying IP config and Sending D-Bus Signal IpConfigApplied')
 			self.applyIpAddressFromDhcpLease()
 			self.applyDefaultGwFromDhcpLease()
 			self.IpConfigApplied(str(self._ifname), str(self._last_ipaddress), str(self._last_netmask), str(self._last_defaultgw), str(self._last_leasetime), dns_space_sep)

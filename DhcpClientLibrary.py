@@ -154,6 +154,7 @@ class RemoteDhcpClientControl:
         
         logger.debug('Got an owner for bus name ' + RemoteDhcpClientControl.DBUS_NAME)
         gobject.threads_init()    # Allow the mainloop to run as an independent thread
+        dbus.mainloop.glib.threads_init()
         
         self._dhcp_client_proxy = self._bus.get_object(RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE, RemoteDhcpClientControl.DBUS_OBJECT_PATH)
         self._dbus_iface = dbus.Interface(self._dhcp_client_proxy, RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE)
@@ -176,9 +177,17 @@ class RemoteDhcpClientControl:
         self._callback_new_lease = None
         
         self._exit_unlock_event = threading.Event() # Create a new threading event that will allow the exit() method to wait for the child to terminate properly
+        self._getversion_unlock_event = threading.Event() # Create a new threading event that will allow the GetVersion() D-Bus call below to execute within a timed limit 
 
         self.status_mutex = threading.Lock()    # This mutex protects writes to the status attribute
         self.status = DhcpLeaseStatus()
+
+        self._getversion_unlock_event.clear()
+        self._remote_version = ''
+        slave_version = self._dbus_iface.GetVersion(reply_handler = self._getVersionUnlock, error_handler = self._getVersionError)
+        if not self._getversion_unlock_event.wait(2):   # We give 2s for slave to answer the GetVersion() request
+            raise Exception('TimeoutOnGetVersion')
+        logger.debug('Slave announces version: ' + self._remote_version)
         
     # D-Bus-related methods
     def _loopHandleDbus(self):
@@ -191,6 +200,14 @@ class RemoteDhcpClientControl:
         logger.debug("Stopping dbus mainloop")
         
     
+    def _getVersionUnlock(self, return_value):
+        self._remote_version = str(return_value)
+        self._getversion_unlock_event.set() # Unlock the wait() on self._getversion_unlock_event
+        
+    def _getVersionError(self, remote_exception):
+        logger.error('Error on invocaiton of GetVersion() to slave, via D-Bus')
+        raise Exception('ErrorOnDBusGetVersion')
+        
     def notifyNewLease(self, callback):
         """
         This method will call the specified callback when the lease becomes valid (or will call it immediately if it is already vali
@@ -210,6 +227,7 @@ class RemoteDhcpClientControl:
         """
         Method called when receiving the IpConfigApplied signal from the slave process
         """
+        logger.debug('Got signal IpConfigApplied')
         with self.status_mutex:
             self.status.ipv4_address = ip
             self.status.ipv4_netmask = netmask
@@ -218,7 +236,7 @@ class RemoteDhcpClientControl:
             self.status.ipv4_leaseduration = leasetime
             self.status.ipv4_leaseexpiry = datetime.datetime.now() + datetime.timedelta(seconds = int(leasetime))    # Calculate the time when the lease will expire
             logger.debug('Lease obtained for IP: ' + ip + '. Will expire at ' + str(self.status.ipv4_leaseexpiry))
-            self.status.ipv4_dnslist = dns_space_sep_list.split(' ')
+            self.status.ipv4_dnslist = dns_space_sep.split(' ')
             if self.status.ipv4_dnslist:
                 logger.debug('Got DNS list: ' + str(self.status.ipv4_dnslist))
         with self._callback_new_lease_mutex:
@@ -469,7 +487,7 @@ class DhcpClientLibrary:
         """
         
         self._dhcp_client_ctrl.notifyNewLease(self._new_lease_event.clear)  # Ask underlying RemoteDhcpClientControl object to call self._new_lease_event.clear() as soon as we get a new lease 
-        self._new_lease_event.wait(timeout)
+        self._new_lease_event.wait(float(timeout))
         ipv4_address = self._dhcp_client_ctrl.getIpv4Address()
         if raise_exceptions and ipv4_address is None:
             raise Exception('DhcpLeaseTimeout')
@@ -510,7 +528,7 @@ if __name__ == '__main__':
     client = DhcpClientLibrary(DHCP_CLIENT_DAEMON, 'eth1')
     client.start()
     print("Waiting 10s to get a DHCP lease")
-    ip_addr = client.wait_lease(10)
+    ip_addr = client.wait_lease('10')
     print("Got a lease with IP address " + ip_addr)
     input('Press enter to stop slave')
     client.stop()

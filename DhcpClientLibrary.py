@@ -163,11 +163,8 @@ class RemoteDhcpClientControl:
                                                   self._handleIpConfigApplied,
                                                   dbus_interface = RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE,
                                                   message_keyword='dbus_message')   # Handle the IpConfigApplied signal
-        self._dhcp_client_proxy.connect_to_signal("IpDnsReceived",
-                                                  self._handleIpDnsReceived,
-                                                  dbus_interface = RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE,
-                                                  message_keyword='dbus_message')   # Handle the IpDnsReceived signal
-        #Lionel: this is for D-Bus debugging only
+        
+        #Lionel: the following line is used for D-Bus debugging only
         #self._bus.add_signal_receiver(catchall_signal_handler, interface_keyword='dbus_interface', member_keyword='member')
         self._dbus_loop_thread = threading.Thread(target = self._loopHandleDbus)    # Start handling D-Bus messages in a background thread
         self._dbus_loop_thread.setDaemon(True)    # D-Bus loop should be forced to terminate when main program exits
@@ -209,7 +206,7 @@ class RemoteDhcpClientControl:
                     with self._callback_new_lease_mutex:
                         self._callback_new_lease = callback
     
-    def _handleIpConfigApplied(self, interface, ip, netmask, defaultgw, leasetime, **kwargs):
+    def _handleIpConfigApplied(self, interface, ip, netmask, defaultgw, leasetime, dns_space_sep, **kwargs):
         """
         Method called when receiving the IpConfigApplied signal from the slave process
         """
@@ -221,6 +218,9 @@ class RemoteDhcpClientControl:
             self.status.ipv4_leaseduration = leasetime
             self.status.ipv4_leaseexpiry = datetime.datetime.now() + datetime.timedelta(seconds = int(leasetime))    # Calculate the time when the lease will expire
             logger.debug('Lease obtained for IP: ' + ip + '. Will expire at ' + str(self.status.ipv4_leaseexpiry))
+            self.status.ipv4_dnslist = dns_space_sep_list.split(' ')
+            if self.status.ipv4_dnslist:
+                logger.debug('Got DNS list: ' + str(self.status.ipv4_dnslist))
         with self._callback_new_lease_mutex:
             if not self._callback_new_lease is None:    # If we have a callback to call when lease becomes valid
                 logger.debug('Calling callback for new lease')
@@ -228,14 +228,6 @@ class RemoteDhcpClientControl:
 
         # Lionel: FIXME: should start a timeout here to make the lease invalid at expiration 
     
-    def _handleIpDnsReceived(self, dns_space_sep_list, **kwargs):
-        """
-        Method called when receiving the IpDnsReceived signal from the slave process
-        """
-        with self.status_mutex:
-            self.status.ipv4_dnslist = dns_space_sep_list.split(' ')
-            logger.debug('Got DNS list: ' + str(self.status.ipv4_dnslist))
-        
     def _handleBusOwnerChanged(self, new_owner):
         """
         Callback called when our D-Bus bus owner changes 

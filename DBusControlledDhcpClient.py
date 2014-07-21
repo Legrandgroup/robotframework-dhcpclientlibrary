@@ -208,7 +208,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		pass
 
 	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
-	def IpConfigApplied(self, interface, ip, netmask, defaultgw, leasetime):
+	def IpConfigApplied(self, interface, ip, netmask, defaultgw, leasetime, dns_space_sep):
 		"""
 		D-Bus decorated method to send the "IpConfigApplied" signal
 		"""
@@ -604,7 +604,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if self._apply_ip and self._ifname:
 			self.applyIpAddressFromDhcpLease()
 			self.applyDefaultGwFromDhcpLease()
-			self.IpConfigApplied(str(self._ifname), str(self._last_ipaddress), str(self._last_netmask), str(self._last_defaultgw), str(self._last_leasetime))
+			self.IpConfigApplied(str(self._ifname), str(self._last_ipaddress), str(self._last_netmask), str(self._last_defaultgw), str(self._last_leasetime), dns_space_sep)
 			self.IpDnsReceived(dns_space_sep)
 	
 	def HandleDhcpAck(self, packet):

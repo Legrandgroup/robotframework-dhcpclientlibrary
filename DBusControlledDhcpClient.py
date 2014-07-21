@@ -670,7 +670,6 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 		lock.acquire(timeout = 0)
 	
 		client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
-		client.setOnExit(exit)	# Tell the client to call exit() when it shuts down (this will allow direct program termination when receiving a D-Bus Exit() message instead of waiting on client.GetNextDhcpPacket() to timeout in the loop below
 		
 		if not args.startondbus:
 			client.sendDhcpDiscover()	# Send a DHCP DISCOVER on the network

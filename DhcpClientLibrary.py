@@ -140,7 +140,7 @@ class RemoteDhcpClientControl:
 
     POLL_WAIT = 1 / 100
     DBUS_NAME = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'    # The name of bus we are connecting to on D-Bus
-    DBUS_OBJECT_PATH = '/com/legrandelectric/RobotFrameworkIPC'    # The name of the D-Bus object under which we will communicate on D-Bus
+    DBUS_OBJECT_PATH = '/com/legrandelectric/RobotFrameworkIPC/DhcpClientLibrary'    # The name of the D-Bus object under which we will communicate on D-Bus
     DBUS_SERVICE_INTERFACE = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'    # The name of the D-Bus service under which we will perform input/output on D-Bus
 
     def __init__(self):

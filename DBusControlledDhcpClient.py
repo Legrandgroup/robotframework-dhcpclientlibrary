@@ -422,7 +422,9 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if not self._silent_mode: print("==>Sending DISCOVER")
 		with self._dhcp_status_mutex:
 			self._request_sent = False
-		self.SendDhcpPacketTo(dhcp_discover, '255.255.255.255', self._server_port)
+		bytes_sent = self.SendDhcpPacketTo(dhcp_discover, '255.255.255.255', self._server_port)
+		if bytes_sent == 0:
+			raise Exception('FailedSendDhcpPacketTo')
 		self.DhcpDiscoverSent()	# Emit DBUS signal
 	
 	def handleDhcpOffer(self, res):
@@ -477,9 +479,11 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_request.SetOption('flags', [128, 0])
 		dhcp_request_type = dhcp_request.GetOption('dhcp_message_type')[0]
 		if not self._silent_mode: print("==>Sending REQUEST")
+		bytes_sent = self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
+		if bytes_sent == 0:
+			raise Exception('FailedSendDhcpPacketTo')
 		with self._dhcp_status_mutex:
 			self._request_sent = True
-		self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
 		self.DhcpRequestSent()	# Emit DBUS signal
 		
 	def sendDhcpRenew(self, ciaddr = None, dstipaddr = '255.255.255.255'):
@@ -517,7 +521,9 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		self.DhcpRenewSent()	# Emit DBUS signal
 		with self._dhcp_status_mutex:
 			self._request_sent = True
-		self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
+		bytes_sent = self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
+		if bytes_sent == 0:
+			raise Exception('FailedSendDhcpPacketTo')
 		self._renew_thread = threading.Timer(self._last_leasetime / 6, self.sendDhcpRenew, [])	# After the first renew is sent, increase the frequency of the next renew packets
 		self._renew_thread.start()
 
@@ -552,7 +558,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 				dhcp_release.SetOption('flags', [128, 0])
 				dhcp_release_type = dhcp_release.GetOption('dhcp_message_type')[0]
 				if not self._silent_mode: print("==>Sending RELEASE")
-				self.DhcpReleaseSent('IP ' +str(self._last_ipaddress))	# Emit DBUS signal
+				release_sent_message = 'IP ' + str(self._last_ipaddress)	# Build a string for the D-Bus signal now before erasing _last_ipaddress
 				with self._dhcp_status_mutex:
 					self._request_sent = False
 					
@@ -566,11 +572,14 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 					
 					self._lease_valid = False
 				self.LeaseLost()	# Notify that the lease becomes invalid via a D-Bus signal
-
-				self.SendDhcpPacketTo(dhcp_release, '255.255.255.255', self._server_port)
+				
+				bytes_sent = self.SendDhcpPacketTo(dhcp_release, '255.255.255.255', self._server_port) 
+				if bytes_sent == 0:
+					raise Exception('FailedSendDhcpPacketTo')
+				self.DhcpReleaseSent(release_sent_message)	# Emit D-Bus signal
 				
 			if unconfigure_iface:
-				self._unconfigure_iface()	# Clean up our ip configuration (revert to standard config for this interface)
+				self._unconfigure_iface()	# Clean up our IP configuration (revert to standard config for this interface)
 	
 	def handleDhcpAck(self, packet):
 		"""

@@ -70,16 +70,8 @@ class DhcpLeaseStatus:
     """
 
     def __init__(self):
-        self.ipv4_address = None
-        self.ipv4_netmask = None
-        self.ipv4_defaultgw = None
-        self.ipv4_dnslist = [None]
-        self.ipv4_dhcpserverid = None
-        self.ipv4_lease_valid = False   # Is the lease valid?
-        self.ipv4_leaseduration = None  # How long the lease lasts
-        #self.ipv4_lease_remaining   # For how long the lease is still valid?
-        self.ipv4_leaseexpiry = None    # When the lease will expire (in UTC time), as a time.struct_time object
         self._dhcp_status_mutex = threading.Lock()    # This mutex protects writes to any of the variables of this object
+        self.reset()
 
     def __repr__(self):
         temp = ''
@@ -102,6 +94,21 @@ class DhcpLeaseStatus:
                 temp += 'IPv4 lease last for: ' + str(self.ipv4_leaseduration) + 's\n'
         return temp
     
+    def reset(self):
+        """
+        Reset internal attribute to no lease state
+        """
+        with self._dhcp_status_mutex:
+            self.ipv4_address = None
+            self.ipv4_netmask = None
+            self.ipv4_defaultgw = None
+            self.ipv4_dnslist = [None]
+            self.ipv4_dhcpserverid = None
+            self.ipv4_lease_valid = False   # Is the lease valid?
+            self.ipv4_leaseduration = None  # How long the lease lasts
+            #self.ipv4_lease_remaining   # For how long the lease is still valid?
+            self.ipv4_leaseexpiry = None    # When the lease will expire (in UTC time), as a time.struct_time object
+
     #===========================================================================
     # @property
     # def ipv4_lease_remaining(self):
@@ -162,6 +169,11 @@ class RemoteDhcpClientControl:
         logger.debug("Connected to D-Bus")
         self._dhcp_client_proxy.connect_to_signal("IpConfigApplied",
                                                   self._handleIpConfigApplied,
+                                                  dbus_interface = RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE,
+                                                  message_keyword='dbus_message')   # Handle the IpConfigApplied signal
+        
+        self._dhcp_client_proxy.connect_to_signal("LeaseLost",
+                                                  self._handleLeaseLost,
                                                   dbus_interface = RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE,
                                                   message_keyword='dbus_message')   # Handle the IpConfigApplied signal
         
@@ -252,7 +264,11 @@ class RemoteDhcpClientControl:
             if not self._callback_new_lease is None:    # If we have a callback to call when lease becomes valid
                 self._callback_new_lease()    # Do the callback
 
-        # Lionel: FIXME: should start a timeout here to make the lease invalid at expiration 
+        # Lionel: FIXME: should start a timeout here to make the lease invalid at expiration (note: the client also does the same, and should issue a LeaseLost signal accordingly but just in case, shouldn't we double check on this side? 
+        
+    def _handleLeaseLost(self, **kwargs):
+        logger.debug('Got signal LeaseLost')
+        self.status.reset() # Reset all data about the previous lease
     
     def _handleBusOwnerChanged(self, new_owner):
         """
@@ -260,9 +276,9 @@ class RemoteDhcpClientControl:
         """
         if new_owner == '':
             logger.warning('No owner anymore for bus name ' + RemoteDhcpClientControl.DBUS_NAME)
+            raise Exception('LostDhcpSlave')
         else:
             pass # Owner exists
-
 
     def _exitUnlock(self):
         """
@@ -334,6 +350,13 @@ class RemoteDhcpClientControl:
                 return [None]
             else:
                 return self.status.ipv4_dnslist
+            
+    def isLeaseValid(self):
+        """
+        Is the current lease valid?
+        """
+        with self.status_mutex:
+            return self.status.ipv4_lease_valid
                 
 
 class SlaveDhcpProcess:
@@ -489,14 +512,20 @@ class DhcpClientLibrary:
         """
         self._new_lease_event.set()
         
+        
     def wait_lease(self, timeout = None, raise_exceptions = True):
+        """ Alias for Wait Ipv4 Lease
+        """
+        return self.wait_ipv4_lease(timeout = timeout, raise_exceptions = raise_exceptions)
+    
+    def wait_ipv4_lease(self, timeout = None, raise_exceptions = True):
         """ Wait until we get a new lease (until timeout if specified)
         DHCP client starts as soon as Start keyword is called, so a lease may already be obtained when running keyword Wait Lease
         
         Return the IP address obtained
         
         Example:
-        | Wait Lease |
+        | Wait Ipv4 Lease |
         =>
         | ${ip_address} |
         """
@@ -507,8 +536,93 @@ class DhcpClientLibrary:
             raise Exception('DhcpLeaseTimeout')
         else:
             return unicode(ipv4_address)
+        
+    
+    def get_address(self):
+        """ Alias for Get Ipv4 Address
+        """
+        return self.get_ipv4_address()
+    
+    def get_ipv4_address(self):
+        """ Get the IPv4 address for the current lease or ${None} if we have no currently valid lease
+        
+        Return the IPv4 address (as a string containing its dotted decimal notation, eg: '192.168.0.10')
+        
+        Example:
+        | Get Ipv4 Address |
+        =>
+        | ${ip_address} |
+        """
+        
+        ipv4_address = self._dhcp_client_ctrl.getIpv4Address()
+        if ipv4_address is None:
+            return None
+        else:
+            return unicode(ipv4_address)
 
 
+    def get_netmask(self):
+        """ Alias for Get Ipv4 Netmask
+        """
+        return self.get_ipv4_netmask()
+    
+    def get_ipv4_netmask(self):
+        """ Get the IPv4 netmask for the current lease or ${None} if we have no currently valid lease
+        
+        Return the IPv4 netmask (as a string containing its dotted decimal notation, eg: '255.255.255.0'
+        
+        Example:
+        | Get Ipv4 Netmask |
+        =>
+        | ${ip_netmask} |
+        """
+        
+        ipv4_netmask = self._dhcp_client_ctrl.getIpv4Netmask()
+        if ipv4_netmask is None:
+            return None
+        else:
+            return unicode(ipv4_netmask)
+
+
+    def get_defaultgw(self):
+        """ Alias for Get Ipv4 DefaultGw
+        """
+        return self.get_ipv4_defaultgw()
+    
+    def get_ipv4_defaultgw(self):
+        """ Get the IPv4 default gateway for the current lease or ${None} if we have no currently valid lease
+        
+        Return the IPv4 default gateway (as a string containing its dotted decimal notation, eg: '192.168.0.1'
+        
+        Example:
+        | Get Ipv4 DefaultGw |
+        =>
+        | ${ip_defaultgw} |
+        """
+        
+        ipv4_defaultgw = self._dhcp_client_ctrl.getIpv4DefaultGateway()
+        if ipv4_defaultgw is None:
+            return None
+        else:
+            return unicode(ipv4_defaultgw)
+    
+    
+    def is_lease_valid(self):
+        """ Alias for Is Ipv4 Lease Valid
+        """
+        return self.is_ipv4_lease_valid()
+    
+    def is_ipv4_lease_valid(self):
+        """ Check if we currently have a valid lease
+        
+        Example:
+        | Is Ipv4 Lease Valid |
+        =>
+        | ${True} |
+        """
+        
+        return self._dhcp_client_ctrl.isLeaseValid()
+    
 
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)    # Use Glib's mainloop as the default loop for all subsequent code
 

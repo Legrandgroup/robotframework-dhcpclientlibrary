@@ -223,6 +223,13 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		"""
 		pass
 	
+	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
+	def LeaseLost(self):
+		"""
+		D-Bus decorated method to send the "LeaseLost" signal
+		"""
+		pass
+
 	def exit(self):
 		"""
 		Cleanup object and stop all threads
@@ -557,6 +564,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 					self._last_leasetime = None
 					
 					self._lease_valid = False
+				self.LeaseLost()	# Notify that the lease becomes invalid via a D-Bus signal
 
 				self.SendDhcpPacketTo(dhcp_release, '255.255.255.255', self._server_port)
 				
@@ -652,6 +660,8 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 			self._lease_valid = False
 			
 			self._request_sent = False
+			
+		self.LeaseLost()
 		
 		raise Exception('DhcpNack')
 	

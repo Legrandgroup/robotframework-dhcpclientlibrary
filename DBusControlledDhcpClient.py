@@ -85,7 +85,7 @@ def dhcpTypeToName(type, exception_on_unknown = True):
 
 
 class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
-	def __init__(self, conn, dbus_loop, object_path=DBUS_OBJECT_PATH, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, apply_ip = False, dump_packets = False, **kwargs):
+	def __init__(self, conn, dbus_loop, object_path=DBUS_OBJECT_PATH, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, apply_ip = False, dump_packets = False, silent_mode = False, **kwargs):
 		"""
 		Instanciate a new DBusControlledDhcpClient client bound to ifname (if specified) or a specific interface address listen_address (if specified)
 		Client listening UDP port and server destination UDP port can also be overridden from their default values
@@ -104,6 +104,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		self._listen_address = listen_address
 		self._client_port = client_port
 		self._server_port = server_port
+		self._silent_mode = silent_mode
 		
 		self._last_ipaddress = None
 		self._last_netmask = None
@@ -163,9 +164,9 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		This method should be run within a thread... This thread's aim is to run the Glib's main loop while the main thread does other actions in the meantime
 		This methods will loop infinitely to receive and send D-Bus messages and will only stop looping when the value of self._loopDbus is set to False (or when the Glib's main loop is stopped using .quit()) 
 		"""
-		print("Starting dbus mainloop")
+		if not self._silent_mode: print("Starting dbus mainloop")
 		self._dbus_loop.run()
-		print("Stopping dbus mainloop")
+		if not self._silent_mode: print("Stopping dbus mainloop")
 	
 	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpDiscoverSent(self):
@@ -245,7 +246,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		"""
 		D-Bus method to stop the DHCP client
 		"""
-		print("Received Exit() command from D-Bus")
+		if not self._silent_mode: print("Received Exit() command from D-Bus")
 		self.exit()	# Inherited dbus.service.Ibject has virtual methods written with an initial capital, so wrap around it to use our method naming convention
 
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
@@ -299,7 +300,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		D-Bus decorated method executed when receiving the D-Bus "Debug" message call
 		This method will just echo on stdout the string given as argument
 		"""
-		print('Received echo message from D-Bus: "' + str(msg) + '"')
+		if not self._silent_mode: print('Received echo message from D-Bus: "' + str(msg) + '"')
 	
 	# IP self configuration-related methods
 	def applyIpAddressFromDhcpLease(self):
@@ -309,10 +310,10 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		""" 
 		self._iface_modified = True
 		cmdline = ['ifconfig', str(self._ifname), '0.0.0.0']
-		print(cmdline)
+		if not self._silent_mode: print(cmdline)
 		subprocess.call(cmdline)
 		cmdline = ['ifconfig', str(self._ifname), str(self._last_ipaddress), 'netmask', str(self._last_netmask)]
-		print(cmdline)
+		if not self._silent_mode: print(cmdline)
 		subprocess.call(cmdline)
 	
 	def applyDefaultGwFromDhcpLease(self):
@@ -322,7 +323,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		""" 
 		self._iface_modified = True
 		cmdline = ['route', 'add', 'default', 'gw', str(self._last_defaultgw)]
-		print(cmdline)
+		if not self._silent_mode: print(cmdline)
 		subprocess.call(cmdline)
 
 	# DHCP-related methods
@@ -375,14 +376,14 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if self._iface_modified:	# Clean up our ip configuration (revert to standard config for this interface)
 			if self._ifname:
 				cmdline = ['ifdown', str(self._ifname)]
-				print(cmdline)
+				if not self._silent_mode: print(cmdline)
 				subprocess.call(cmdline)
 				time.sleep(0.2)	# Grrrr... on some implementations, ifdown returns too early (before actually doing its job)
 				cmdline = ['ifconfig', str(self._ifname), '0.0.0.0', 'down']	# Make sure we get rid of the IP address
-				print(cmdline)
+				if not self._silent_mode: print(cmdline)
 				subprocess.call(cmdline)
 				cmdline = ['ifup', str(self._ifname)]
-				print(cmdline)
+				if not self._silent_mode: print(cmdline)
 				subprocess.call(cmdline)
 				self._iface_modified = False
 
@@ -418,7 +419,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		#client.dhcp_socket.settimeout(timeout)
 		dhcp_discover.SetOption('flags',[128, 0])
 		dhcp_discover_type = dhcp_discover.GetOption('dhcp_message_type')[0]
-		print("==>Sending DISCOVER")
+		if not self._silent_mode: print("==>Sending DISCOVER")
 		with self._dhcp_status_mutex:
 			self._request_sent = False
 		self.DhcpDiscoverSent()	# Emit DBUS signal
@@ -433,7 +434,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		message = "==>Received " + dhcpTypeToName(dhcp_message_type, False)
 		if self._dump_packets:
 			message += ' with content:'
-		print(message)
+		if not self._silent_mode: print(message)
 		if self._dump_packets:
 			print(dhcp_offer.str())
 		
@@ -475,7 +476,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		#self.dhcp_socket.settimeout(timeout)
 		dhcp_request.SetOption('flags', [128, 0])
 		dhcp_request_type = dhcp_request.GetOption('dhcp_message_type')[0]
-		print("==>Sending REQUEST")
+		if not self._silent_mode: print("==>Sending REQUEST")
 		self.DhcpRequestSent()	# Emit DBUS signal
 		with self._dhcp_status_mutex:
 			self._request_sent = True
@@ -512,7 +513,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 			dhcp_request.SetOption('parameter_request_list', self._parameter_list)	# Resend the same parameter list as for DISCOVER
 		dhcp_request.SetOption('flags', [128, 0])
 		dhcp_request_type = dhcp_request.GetOption('dhcp_message_type')[0]
-		print("==>Sending REQUEST (renewing lease)")
+		if not self._silent_mode: print("==>Sending REQUEST (renewing lease)")
 		self.DhcpRenewSent()	# Emit DBUS signal
 		with self._dhcp_status_mutex:
 			self._request_sent = True
@@ -550,7 +551,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 				#self.dhcp_socket.settimeout(timeout)
 				dhcp_release.SetOption('flags', [128, 0])
 				dhcp_release_type = dhcp_release.GetOption('dhcp_message_type')[0]
-				print("==>Sending RELEASE")
+				if not self._silent_mode: print("==>Sending RELEASE")
 				self.DhcpReleaseSent('IP ' +str(self._last_ipaddress))	# Emit DBUS signal
 				with self._dhcp_status_mutex:
 					self._request_sent = False
@@ -578,7 +579,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		message = "==>Received ACK"
 		if self._dump_packets:
 			message += ' with content:'
-		print(message)
+		if not self._silent_mode: print(message)
 		if self._dump_packets:
 			print(packet.str())
 		
@@ -586,7 +587,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 			if self._request_sent:
 				self._request_sent = False
 			else:
-				print("Received an ACK without having sent a REQUEST")
+				if not self._silent_mode: print("Received an ACK without having sent a REQUEST")
 				#raise Exception('UnexpectedAck')
 			
 			self._last_ipaddress = ipv4(packet.GetOption('yiaddr'))
@@ -614,7 +615,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 				'SERVER ' + str(self._last_serverid),
 				'LEASETIME ' + str(self._last_leasetime))
 		
-		print('Starting renew thread')
+		if not self._silent_mode: print('Starting renew thread')
 		if not self._renew_thread is None: self._renew_thread.cancel()	# Cancel the renew timeout
 		if not self._release_thread is None: self._release_thread.cancel()	# Cancel the release timeout
 		
@@ -624,7 +625,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		self._release_thread.start()
 		
 		if self._apply_ip and self._ifname:
-			#print('Applying IP config and Sending D-Bus Signal IpConfigApplied')
+			if not self._silent_mode: print('Applying IP config and Sending D-Bus Signal IpConfigApplied')
 			self.applyIpAddressFromDhcpLease()
 			self.applyDefaultGwFromDhcpLease()
 			self.IpConfigApplied(str(self._ifname), str(self._last_ipaddress), str(self._last_netmask), str(self._last_defaultgw), str(self._last_leasetime), dns_space_sep)
@@ -645,7 +646,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		message = "==>Received NACK"
 		if self._dump_packets:
 			message += ' with content:'
-		print(message)
+		if not self._silent_mode: print(message)
 		if self._dump_packets:
 			print(packet.str())
 
@@ -681,7 +682,7 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 	parser.add_argument('-i', '--ifname', type=str, help='network interface on which to send/receive DHCP packets', required=True)
 	parser.add_argument('-A', '--applyconfig', action='store_true', help='apply the IP config (ip address, netmask and default gateway) to the interface when lease is obtained')
 	parser.add_argument('-D', '--dumppackets', action='store_true', help='dump received packets content', default=False)
-	parser.add_argument('-S', '--startondbus', action='store_true', help='only start the DHCP client when receiving a D-Bus Discover() method', default=False)
+	parser.add_argument('-S', '--startondbus', action='store_true', help='only start the DHCP client when receiving a D-Bus Discover() method (also suppresses all stdout output)', default=False)
 	parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
 	args = parser.parse_args()
 	
@@ -696,7 +697,7 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 	try:
 		lock.acquire(timeout = 0)
 	
-		client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
+		client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets, silent_mode = args.startondbus)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
 		
 		if not args.startondbus:
 			client.sendDhcpDiscover()	# Send a DHCP DISCOVER on the network
@@ -706,7 +707,7 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 		finally:
 			client.exit()
 	except lockfile.AlreadyLocked:
-		print(progname + ': Error: Could not get lock on file ' + lockfilename + '.lock')
+		print(progname + ': Error: Could not get lock on file ' + lockfilename + '.lock', file=sys.stderr)
 	finally:
 		if lock and lock.i_am_locking():
-				lock.release()
+			lock.release()

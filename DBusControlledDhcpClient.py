@@ -22,6 +22,7 @@ import MacAddr
 import threading
 import time
 
+import atexit
 import lockfile
 
 sys.path.insert(0, '/opt/python-local/lib/python2.7/site-packages/')
@@ -29,9 +30,11 @@ sys.path.insert(0, '/opt/python-local/lib/python2.7/site-packages/')
 from pydhcplib.dhcp_packet import *
 from pydhcplib.dhcp_network import *
 
+#import pyiface	# Commented-out... for now we are using the system's userspace tools (ifconfig, route etc...)
+
 progname = os.path.basename(sys.argv[0])
 
-#import pyiface	# Commented-out... for now we are using the system's userspace tools (ifconfig, route etc...)
+main_lock = None	# FileLock object used to force only one DHCP client instance on a given network interface
 
 VERSION = '1.0.0'
 
@@ -82,6 +85,20 @@ def dhcpTypeToName(type, exception_on_unknown = True):
 			raise
 		else:
 			return 'UNKNOWN'
+
+
+def cleanupAtExit():
+    """
+    Called when this program is terminated, to release the lock
+    """
+    
+    global main_lock
+    
+    print('in cleanupAtExit()')
+    if main_lock and main_lock.i_am_locking():
+		print('Releasing lock file')
+		main_lock.release()
+		main_lock = None
 
 
 class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
@@ -685,6 +702,8 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)	# Use Glib's mainloop as the default loop for all subsequent code
 
 if __name__ == '__main__':
+	atexit.register(cleanupAtExit)
+	
 	parser = argparse.ArgumentParser(description="This program launches a DHCP client daemon. \
 It will report every DHCP client state change via D-Bus signal. \
 It will also accept D-Bus method calls to change its behaviour (see Exit(), Renew(), Restart() and FreezeRenew() methods.", prog=progname)
@@ -702,11 +721,14 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 	name = dbus.service.BusName(DBUS_NAME, system_bus)      # Publish the name to the D-Bus so that clients can see us
 	
 	lockfilename = '/var/lock/' + progname + '.' + args.ifname
-	lock = lockfile.FileLock(lockfilename)
-	try:
-		lock.acquire(timeout = 0)
 	
-		client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets, silent_mode = args.startondbus)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
+	global main_lock
+	main_lock = lockfile.FileLock(lockfilename)
+	try:
+		main_lock.acquire(timeout = 0)
+	
+		client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets, silent_mode = False)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
+		client.setOnExit(exit)
 		
 		if not args.startondbus:
 			client.sendDhcpDiscover()	# Send a DHCP DISCOVER on the network
@@ -717,6 +739,3 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 			client.exit()
 	except lockfile.AlreadyLocked:
 		print(progname + ': Error: Could not get lock on file ' + lockfilename + '.lock', file=sys.stderr)
-	finally:
-		if lock and lock.i_am_locking():
-			lock.release()

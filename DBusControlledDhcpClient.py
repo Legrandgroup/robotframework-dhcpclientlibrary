@@ -422,8 +422,8 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if not self._silent_mode: print("==>Sending DISCOVER")
 		with self._dhcp_status_mutex:
 			self._request_sent = False
-		self.DhcpDiscoverSent()	# Emit DBUS signal
 		self.SendDhcpPacketTo(dhcp_discover, '255.255.255.255', self._server_port)
+		self.DhcpDiscoverSent()	# Emit DBUS signal
 	
 	def handleDhcpOffer(self, res):
 		"""
@@ -441,7 +441,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		proposed_ip = ipv4(dhcp_offer.GetOption('yiaddr'))
 		server_id = ipv4(dhcp_offer.GetOption('server_identifier'))
 		self.DhcpOfferRecv('IP ' + str(proposed_ip), 'SERVER ' + str(server_id))	# Emit DBUS signal with proposed IP address
-		self.sendDhcpRequest(requested_ip = ipv4(dhcp_offer.GetOption('yiaddr')), server_id = server_id)
+		self.sendDhcpRequest(requested_ip = proposed_ip, server_id = server_id)
 	
 	def HandleDhcpOffer(self, res):
 		"""
@@ -477,10 +477,10 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_request.SetOption('flags', [128, 0])
 		dhcp_request_type = dhcp_request.GetOption('dhcp_message_type')[0]
 		if not self._silent_mode: print("==>Sending REQUEST")
-		self.DhcpRequestSent()	# Emit DBUS signal
 		with self._dhcp_status_mutex:
 			self._request_sent = True
 		self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
+		self.DhcpRequestSent()	# Emit DBUS signal
 		
 	def sendDhcpRenew(self, ciaddr = None, dstipaddr = '255.255.255.255'):
 		"""

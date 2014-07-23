@@ -551,7 +551,30 @@ class DhcpClientLibrary:
         else:
             return unicode(ipv4_defaultgw)
     
+        
+    def get_dns_list(self):
+        """ Alias for Get Ipv4 Dns List
+        """
+        return self.get_ipv4_dns_list()
     
+    def get_ipv4_dns_list(self):
+        """ Get the IPv4 dns list for the current lease or [${None}] if we have no currently valid lease
+        
+        Return the IPv4 default gateway (as a list containing one entry per DNS server, each entry being a string with a dotted decimal notation, eg: '192.168.0.1')
+        
+        Example:
+        | Get Ipv4 Dns List |
+        =>
+        | ${ip_dns_list} |
+        """
+        
+        ipv4_dns_list = self._dhcp_client_ctrl.getIpv4DnsList()
+        if ipv4_dns_list is None:
+            return [None]
+        else
+            return map(unicode, ipv4_dns_list)
+        
+        
     def is_lease_valid(self):
         """ Alias for Is Ipv4 Lease Valid
         """

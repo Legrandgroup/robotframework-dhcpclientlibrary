@@ -199,9 +199,9 @@ class RemoteDhcpClientControl:
             self.status.ipv4_netmask = netmask
             self.status.ipv4_defaultgw = defaultgw
             self.status.ipv4_lease_valid = True
-            self.status.ipv4_leaseduration = leasetime
-            self.status.ipv4_leaseexpiry = datetime.datetime.now() + datetime.timedelta(seconds = int(leasetime))    # Calculate the time when the lease will expire
-            logger.debug('Lease obtained for IP: ' + ip + '. Will expire at ' + str(self.status.ipv4_leaseexpiry))
+            self.status.ipv4_lease_duration = leasetime
+            self.status.ipv4_lease_expiry = datetime.datetime.now() + datetime.timedelta(seconds = int(leasetime))    # Calculate the time when the lease will expire
+            logger.debug('Lease obtained for IP: ' + ip + '. Will expire at ' + str(self.status.ipv4_lease_expiry))
             self.status.ipv4_dnslist = dns_space_sep.split(' ')
             if self.status.ipv4_dnslist:
                 logger.debug('Got DNS list: ' + str(self.status.ipv4_dnslist))

@@ -26,8 +26,8 @@ class DhcpLeaseStatus:
                     temp += 'IPv4 DNS:' + str(dns) + '\n'
             if not self.ipv4_dhcpserverid is None:
                 temp += 'IPv4 DHCP server: ' + str(self.ipv4_dhcpserverid) + '\n'
-            if not self.ipv4_leaseduration is None:
-                temp += 'IPv4 lease last for: ' + str(self.ipv4_leaseduration) + 's\n'
+            if not self.ipv4_lease_duration is None:
+                temp += 'IPv4 lease last for: ' + str(self.ipv4_lease_duration) + 's\n'
         return temp
     
     def reset(self):
@@ -41,9 +41,9 @@ class DhcpLeaseStatus:
             self.ipv4_dnslist = [None]
             self.ipv4_dhcpserverid = None
             self.ipv4_lease_valid = False   # Is the lease valid?
-            self.ipv4_leaseduration = None  # How long the lease lasts
+            self.ipv4_lease_duration = None  # How long the lease lasts
             #self.ipv4_lease_remaining   # For how long the lease is still valid?
-            self.ipv4_leaseexpiry = None    # When the lease will expire (in UTC time), as a time.struct_time object
+            self.ipv4_lease_expiry = None    # When the lease will expire (in UTC time), as a time.struct_time object
 
 
 

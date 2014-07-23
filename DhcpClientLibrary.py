@@ -70,7 +70,7 @@ class DhcpLeaseStatus:
     """
 
     def __init__(self):
-        #self._dhcp_status_mutex = threading.Lock()    # This mutex protects writes to any of the variables of this object
+        self._dhcp_status_mutex = threading.Lock()    # This mutex protects writes to any of the variables of this object
         self.reset()
 
     def __repr__(self):
@@ -191,7 +191,6 @@ class RemoteDhcpClientControl:
         self._exit_unlock_event = threading.Event() # Create a new threading event that will allow the exit() method to wait for the child to terminate properly
         self._getversion_unlock_event = threading.Event() # Create a new threading event that will allow the GetVersion() D-Bus call below to execute within a timed limit 
 
-        self.status_mutex = threading.Lock()    # This mutex protects writes to the status attribute
         self.status = DhcpLeaseStatus()
 
         self._getversion_unlock_event.clear()
@@ -199,7 +198,12 @@ class RemoteDhcpClientControl:
         slave_version = self._dbus_iface.GetVersion(reply_handler = self._getVersionUnlock, error_handler = self._getVersionError)
         if not self._getversion_unlock_event.wait(2):   # We give 2s for slave to answer the GetVersion() request
             raise Exception('TimeoutOnGetVersion')
-        logger.debug('Slave announces version: ' + self._remote_version)
+        
+        global all_processes_pid
+        slave_pid = self._dbus_iface.GetPid()
+        if slave_pid:
+            all_processes_pid += [slave_pid]
+        logger.debug('Slave has PID ' + str(slave_pid) + ' and version: ' + self._remote_version)
         
     # D-Bus-related methods
     def _loopHandleDbus(self):
@@ -237,7 +241,7 @@ class RemoteDhcpClientControl:
         if not hasattr(callback, '__call__'):
             raise Exception('WrongCallback')
         else:
-            with self.status_mutex:
+            with self.status._dhcp_status_mutex:
                 if self.status.ipv4_lease_valid:
                     callback()  # Call callback function right now if lease is already valid
                 else:   # We still hold the mutex here because we don't want ipv4_lease_valid to be changed before we install the callback ;-)
@@ -249,7 +253,7 @@ class RemoteDhcpClientControl:
         Method called when receiving the IpConfigApplied signal from the slave process
         """
         logger.debug('Got signal IpConfigApplied')
-        with self.status_mutex:
+        with self.status._dhcp_status_mutex:
             self.status.ipv4_address = ip
             self.status.ipv4_netmask = netmask
             self.status.ipv4_defaultgw = defaultgw
@@ -312,7 +316,7 @@ class RemoteDhcpClientControl:
         Get the current IPv4 address obtained by the DHCP client or None if we have no valid lease
         Returns it as string containing a dotted-decimal IPv4 address
         """
-        with self.status_mutex:
+        with self.status._dhcp_status_mutex:
             if self.status.ipv4_lease_valid is None:
                 return None
             else:
@@ -323,7 +327,7 @@ class RemoteDhcpClientControl:
         Get the current IPv4 netmask obtained by the DHCP client or None if we have no valid lease
         Returns it as string containing a dotted-decimal IPv4 address
         """
-        with self.status_mutex:
+        with self.status._dhcp_status_mutex:
             if self.status.ipv4_lease_valid is None:
                 return None
             else:
@@ -334,7 +338,7 @@ class RemoteDhcpClientControl:
         Get the current IPv4 default gateway obtained by the DHCP client or None if we have no valid lease
         Returns it as string containing a dotted-decimal IPv4 address
         """
-        with self.status_mutex:
+        with self.status._dhcp_status_mutex:
             if self.status.ipv4_lease_valid is None:
                 return None
             else:
@@ -345,7 +349,7 @@ class RemoteDhcpClientControl:
         Get the current list of IPv4 DNS obtained by the DHCP client or [None] if we have no valid lease
         Returns it as list of strings, each containing a dotted-decimal IPv4 address for each DNS server
         """
-        with self.status_mutex:
+        with self.status._dhcp_status_mutex:
             if self.status.ipv4_lease_valid is None:
                 return [None]
             else:
@@ -355,7 +359,7 @@ class RemoteDhcpClientControl:
         """
         Is the current lease valid?
         """
-        with self.status_mutex:
+        with self.status._dhcp_status_mutex:
             return self.status.ipv4_lease_valid
                 
 
@@ -385,7 +389,7 @@ class SlaveDhcpProcess:
             logger.debug('Running command ' + str(cmd))
             self._slave_dhcp_client_proc = subprocess.Popen(cmd)#, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
             self._slave_dhcp_client_pid = self._slave_dhcp_client_proc.pid
-            all_processes_pid += [self._slave_dhcp_client_proc.pid]
+            all_processes_pid += [self._slave_dhcp_client_proc.pid] # Add the PID of the child to the list of subprocesses (note: we get sudo's PID here, not the slave PID, that we will get later on via D-Bus (see RemoteDhcpClientControl.__init__)
         except:
             raise   # Reraise exception exception handling
     

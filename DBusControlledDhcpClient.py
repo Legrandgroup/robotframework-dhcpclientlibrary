@@ -30,6 +30,8 @@ sys.path.insert(0, '/opt/python-local/lib/python2.7/site-packages/')
 from pydhcplib.dhcp_packet import *
 from pydhcplib.dhcp_network import *
 
+import DhcpLeaseStatus
+
 #import pyiface	# Commented-out... for now we are using the system's userspace tools (ifconfig, route etc...)
 
 progname = os.path.basename(sys.argv[0])
@@ -122,22 +124,14 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		self._server_port = server_port
 		self._silent_mode = silent_mode
 		
-		self._last_ipaddress = None
-		self._last_netmask = None
-		self._last_defaultgw = None
-		self._last_dnsip_list = [None]
+		self._dhcp_status = DhcpLeaseStatus.DhcpLeaseStatus()
 		
-		self._last_serverid = None
-		self._lease_valid = False
-		self._last_leasetime = None
 		self._request_sent = False
 		
 		self._parameter_list = None	# DHCP Parameter request list (options requested from the DHCP server)
 		
 		self._random = None
 		
-		self._dhcp_status_mutex = threading.Lock()	# This mutex protects writes to any of the DHCP state machine and environment (so this does not include the variables below)
-
 		self._renew_thread = None
 		self._release_thread = None
 		
@@ -164,6 +158,9 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 				self._mac_addr = MacAddr.getHwAddrForIp(ip = self._listen_address)
 			else:
 				raise Exception('NoInterfaceProvided')
+		
+		self._current_xid = None
+		self._xid_mutex = threading.Lock()      # This mutex protects writes to the _current_xid attribute
 		self.genNewXid()	# Generate a random transaction ID for future packet exchanges
 	
 	def setOnExit(self, function):
@@ -332,26 +329,28 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 	# IP self configuration-related methods
 	def applyIpAddressFromDhcpLease(self):
 		"""
-		Apply the IP address and netmask that we currently have in out self._last_ipaddress and self._last_netmask (got from last lease)
+		Apply the IP address and netmask that we currently have in out self._dhcp_status (got from last lease)
 		Warning : we won't check if the lease is still valid now, this is up to the caller
 		""" 
 		self._iface_modified = True
 		cmdline = ['ifconfig', str(self._ifname), '0.0.0.0']
 		if not self._silent_mode: print(cmdline)
 		subprocess.call(cmdline)
-		cmdline = ['ifconfig', str(self._ifname), str(self._last_ipaddress), 'netmask', str(self._last_netmask)]
-		if not self._silent_mode: print(cmdline)
-		subprocess.call(cmdline)
+		if self._dhcp_status.ipv4_address:
+			cmdline = ['ifconfig', str(self._ifname), str(self._dhcp_status.ipv4_address), 'netmask', str(self._dhcp_status.ipv4_netmask)]
+			if not self._silent_mode: print(cmdline)
+			subprocess.call(cmdline)
 	
 	def applyDefaultGwFromDhcpLease(self):
 		"""
-		Apply the default gatewau that we currently have in out self._last_defaultgw (got from last lease)
+		Apply the default gateway that we currently have in out self._dhcp_status (got from last lease)
 		Warning : we won't check if the lease is still valid now, this is up to the caller
 		""" 
 		self._iface_modified = True
-		cmdline = ['route', 'add', 'default', 'gw', str(self._last_defaultgw)]
-		if not self._silent_mode: print(cmdline)
-		subprocess.call(cmdline)
+		if self._dhcp_status.ipv4_defaultgw:
+			cmdline = ['route', 'add', 'default', 'gw', str(self._dhcp_status.ipv4_defaultgw)]
+			if not self._silent_mode: print(cmdline)
+			subprocess.call(cmdline)
 
 	# DHCP-related methods
 	def genNewXid(self):
@@ -360,7 +359,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		It will be stored inside the _current_xid property of this object and used in all subsequent DHCP packets sent by this object
 		It can be retrieved using getXid()
 		"""
-		with self._dhcp_status_mutex:
+		with self._xid_mutex:
 			if self._random is None:
 				self._random = random.Random()
 				self._random.seed()
@@ -386,7 +385,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		Set the transaction ID that will be used for all subsequent DHCP packets sent by us
 		We are expecting a 32-bit integer as argument xid
 		"""
-		with self._dhcp_status_mutex:
+		with self._xid_mutex:
 			self._current_xid = xid
 	
 	def getXid(self):
@@ -447,8 +446,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_discover.SetOption('flags',[128, 0])
 		dhcp_discover_type = dhcp_discover.GetOption('dhcp_message_type')[0]
 		if not self._silent_mode: print("==>Sending DISCOVER")
-		with self._dhcp_status_mutex:
-			self._request_sent = False
+		self._request_sent = False
 		bytes_sent = self.SendDhcpPacketTo(dhcp_discover, '255.255.255.255', self._server_port)
 		if bytes_sent == 0:
 			raise Exception('FailedSendDhcpPacketTo')
@@ -509,8 +507,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		bytes_sent = self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
 		if bytes_sent == 0:
 			raise Exception('FailedSendDhcpPacketTo')
-		with self._dhcp_status_mutex:
-			self._request_sent = True
+		self._request_sent = True
 		self.DhcpRequestSent()	# Emit DBUS signal
 		
 	def sendDhcpRenew(self, ciaddr = None, dstipaddr = '255.255.255.255'):
@@ -532,10 +529,11 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_request.SetOption('giaddr', ipv4('0.0.0.0').list())
 		dhcp_request.SetOption('chaddr', hwmac(self._mac_addr).list() + [0] * 10)
 		if ciaddr is None:
-			if self._lease_valid:
-				ciaddr = self._last_ipaddress
-			else:
-				raise Exception('RenewOnInvalidLease')
+			with self._dhcp_status._dhcp_status_mutex:	# Hold the mutex so that ipv4_lease_valid and ipv4_address remain coherent for the whole operation
+				if self._dhcp_status.ipv4_lease_valid:
+					ciaddr = ipv4(self._dhcp_status.ipv4_address)
+				else:
+					raise Exception('RenewOnInvalidLease')
 		dhcp_request.SetOption('ciaddr', ciaddr.list())
 		dhcp_request.SetOption('siaddr', ipv4('0.0.0.0').list())
 		dhcp_request.SetOption('dhcp_message_type', [dhcpNameToType('REQUEST')])
@@ -546,12 +544,13 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		dhcp_request_type = dhcp_request.GetOption('dhcp_message_type')[0]
 		if not self._silent_mode: print("==>Sending REQUEST (renewing lease)")
 		self.DhcpRenewSent()	# Emit DBUS signal
-		with self._dhcp_status_mutex:
-			self._request_sent = True
+		self._request_sent = True
 		bytes_sent = self.SendDhcpPacketTo(dhcp_request, dstipaddr, self._server_port)
 		if bytes_sent == 0:
 			raise Exception('FailedSendDhcpPacketTo')
-		self._renew_thread = threading.Timer(self._last_leasetime / 6, self.sendDhcpRenew, [])	# After the first renew is sent, increase the frequency of the next renew packets
+		# After the first renew is sent, increase the frequency of the next renew packets (send 5 more renew during the second half of the lease)
+		self._renew_thread = threading.Timer(self._dhcp_status.ipv4_lease_duration / 5 / 2, self.sendDhcpRenew, [])
+		
 		self._renew_thread.setDaemon(True)
 		self._renew_thread.start()
 
@@ -566,7 +565,12 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if not self._renew_thread is None:	# If there was a lease currently obtained
 			self._renew_thread = None	# Delete pointer to the renew (we have lost our lease)
 			
-			if not self._last_ipaddress is None:	# Do we have a lease?
+			with self._dhcp_status._dhcp_status_mutex:	# Copy locally the values used in the next part so that they are coherent (even if obsolete)
+				ipv4_lease_valid = self._dhcp_status.ipv4_lease_valid
+				ipv4_address = self._dhcp_status.ipv4_address
+				ipv4_dhcpserverid = self._dhcp_status.ipv4_dhcpserverid
+			
+			if ipv4_lease_valid and ipv4_address:	# Do we have a lease and a valid IPv4 address?
 				self.genNewXid()
 				dhcp_release = DhcpPacket()
 				dhcp_release.SetOption('op', [1])
@@ -576,29 +580,19 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 				dhcp_release.SetOption('xid', self._getXitAsDhcpOption())
 				dhcp_release.SetOption('giaddr', ipv4('0.0.0.0').list())
 				dhcp_release.SetOption('chaddr', hwmac(self._mac_addr).list() + [0] * 10)
-				dhcp_release.SetOption('ciaddr', self._last_ipaddress.list())
+				dhcp_release.SetOption('ciaddr', ipv4(ipv4_address).list())
 				dhcp_release.SetOption('siaddr', ipv4('0.0.0.0').list())
 				dhcp_release.SetOption('dhcp_message_type', [dhcpNameToType('RELEASE')])
 				dhcp_release.SetOption('client_identifier', [CLIENT_ID_HWTYPE_ETHER] + hwmac(self._mac_addr).list())
-				if not self._last_serverid is None:
-					dhcp_release.SetOption('server_identifier', self._last_serverid.list())
+				if ipv4_dhcpserverid:
+					dhcp_release.SetOption('server_identifier', ipv4(ipv4_dhcpserverid).list())
 				#self.dhcp_socket.settimeout(timeout)
 				dhcp_release.SetOption('flags', [128, 0])
 				dhcp_release_type = dhcp_release.GetOption('dhcp_message_type')[0]
 				if not self._silent_mode: print("==>Sending RELEASE")
-				release_sent_message = 'IP ' + str(self._last_ipaddress)	# Build a string for the D-Bus signal now before erasing _last_ipaddress
-				with self._dhcp_status_mutex:
-					self._request_sent = False
-					
-					self._last_ipaddress = None
-					self._last_netmask = None
-					self._last_defaultgw = None
-					self._last_dnsip_list = None
-					
-					self._last_serverid = None
-					self._last_leasetime = None
-					
-					self._lease_valid = False
+				release_sent_message = 'IP ' + str(ipv4_address)	# Build a string for the D-Bus signal now before erasing _last_ipaddress
+				self._request_sent = False
+				self._dhcp_status.reset()
 				self.LeaseLost()	# Notify that the lease becomes invalid via a D-Bus signal
 				
 				bytes_sent = self.SendDhcpPacketTo(dhcp_release, '255.255.255.255', self._server_port) 
@@ -620,46 +614,50 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if self._dump_packets:
 			print(packet.str())
 		
-		with self._dhcp_status_mutex:
-			if self._request_sent:
-				self._request_sent = False
-			else:
-				if not self._silent_mode: print("Received an ACK without having sent a REQUEST")
-				#raise Exception('UnexpectedAck')
+		if self._request_sent:
+			self._request_sent = False
+		else:
+			if not self._silent_mode: print("Received an ACK without having sent a REQUEST")
+			#raise Exception('UnexpectedAck')
+		
+		ipv4_address = str(ipv4(packet.GetOption('yiaddr')))
+		ipv4_netmask = str(ipv4(packet.GetOption('subnet_mask')))
+		ipv4_defaultgw = str(ipv4(packet.GetOption('router')))
+		ipv4_dnslist = []
+		dnsip_array = packet.GetOption('domain_name_server')	# DNS is of type ipv4+ so we could get more than one router IPv4 address... handle all DNS entries in a list
+		for i in range(0, len(dnsip_array), 4):
+			if len(dnsip_array[i:i+4]) == 4:
+				ipv4_dnslist += [str(ipv4(dnsip_array[i:i+4]))]
+		ipv4_dhcpserverid = str(ipv4(packet.GetOption('server_identifier')))
+		ipv4_lease_duration = ipv4(packet.GetOption('ip_address_lease_time')).int()
+
+		
+		with self._dhcp_status._dhcp_status_mutex:
+			self._dhcp_status.ipv4_address = ipv4_address
+			self._dhcp_status.ipv4_netmask = ipv4_netmask
+			self._dhcp_status.ipv4_defaultgw = ipv4_defaultgw	# router is of type ipv4+ so we could get more than one router IPv4 address... but we only pick up the first one here
+			self._dhcp_status.ipv4_dnslist = ipv4_dnslist
+			self._dhcp_status.ipv4_dhcpserverid = ipv4_dhcpserverid
+			self._dhcp_status.ipv4_lease_duration = ipv4_lease_duration
+			self._dhcp_status.ipv4_lease_valid = True
 			
-			self._last_ipaddress = ipv4(packet.GetOption('yiaddr'))
-			self._last_netmask = ipv4(packet.GetOption('subnet_mask'))
-			self._last_defaultgw = ipv4(packet.GetOption('router'))	# router is of type ipv4+ so we could get more than one router IPv4 address... but we only pick up the first one here
-			
-			self._last_dnsip_list = []
-			
-			dnsip_array = packet.GetOption('domain_name_server')	# DNS is of type ipv4+ so we could get more than one router IPv4 address... handle all DNS entries in a list
-			for i in range(0, len(dnsip_array), 4):
-				if len(dnsip_array[i:i+4]) == 4:
-					self._last_dnsip_list += [ipv4(dnsip_array[i:i+4])]
-			
-			self._last_serverid = ipv4(packet.GetOption('server_identifier'))
-			self._last_leasetime = ipv4(packet.GetOption('ip_address_lease_time')).int()
-			
-			self._lease_valid = True
-			
-			dns_space_sep = ' '.join(map(str, self._last_dnsip_list))
-			
-			self.DhcpAckRecv('IP ' + str(self._last_ipaddress),
-				'NETMASK ' + str(self._last_netmask),
-				'DEFAULTGW ' + str(self._last_defaultgw),
-				'DNS ' + dns_space_sep,
-				'SERVER ' + str(self._last_serverid),
-				'LEASETIME ' + str(self._last_leasetime))
+		dns_space_sep = ' '.join(ipv4_dnslist)
+		
+		self.DhcpAckRecv('IP ' + str(ipv4_address),
+			'NETMASK ' + str(ipv4_netmask),
+			'DEFAULTGW ' + str(ipv4_defaultgw),
+			'DNS ' + dns_space_sep,
+			'SERVER ' + str(ipv4_dhcpserverid),
+			'LEASEDURATION ' + str(ipv4_lease_duration))
 		
 		if not self._silent_mode: print('Starting renew thread')
 		if not self._renew_thread is None: self._renew_thread.cancel()	# Cancel the renew timeout
 		if not self._release_thread is None: self._release_thread.cancel()	# Cancel the release timeout
 		
-		self._renew_thread = threading.Timer(self._last_leasetime / 2, self.sendDhcpRenew, [])
+		self._renew_thread = threading.Timer(ipv4_lease_duration / 2, self.sendDhcpRenew, [])
 		self._renew_thread.setDaemon(True)
 		self._renew_thread.start()
-		self._release_thread = threading.Timer(self._last_leasetime, self.sendDhcpRelease, [])	# Restart the release timeout
+		self._release_thread = threading.Timer(ipv4_lease_duration, self.sendDhcpRelease, [])	# Restart the release timeout
 		self._release_thread.setDaemon(True)
 		self._release_thread.start()
 		
@@ -667,7 +665,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 			if not self._silent_mode: print('Applying IP config and Sending D-Bus Signal IpConfigApplied')
 			self.applyIpAddressFromDhcpLease()
 			self.applyDefaultGwFromDhcpLease()
-			self.IpConfigApplied(str(self._ifname), str(self._last_ipaddress), str(self._last_netmask), str(self._last_defaultgw), str(self._last_leasetime), dns_space_sep)
+			self.IpConfigApplied(str(self._ifname), str(ipv4_address), str(ipv4_netmask), str(ipv4_defaultgw), str(ipv4_lease_duration), dns_space_sep)
 			self.IpDnsReceived(dns_space_sep)
 	
 	def HandleDhcpAck(self, packet):
@@ -689,17 +687,8 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if self._dump_packets:
 			print(packet.str())
 
-		with self._dhcp_status_mutex:
-			self._last_ipaddress = None
-			self._last_netmask = None
-			self._last_defaultgw = None
-			self._last_dnsip_list = []
-			
-			self._last_serverid = None
-			self._last_leasetime = None
-			self._lease_valid = False
-			
-			self._request_sent = False
+		self._dhcp_status.reset()
+		self._request_sent = False
 			
 		self.LeaseLost()
 		

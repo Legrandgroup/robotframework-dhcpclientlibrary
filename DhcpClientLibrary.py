@@ -301,6 +301,18 @@ class RemoteDhcpClientControl:
             else:
                 return self.status.ipv4_dnslist
             
+    def getIpv4DhcpServerId(self):
+        """
+        Get the current IPv4 DHCP server ID gateway obtained by the DHCP client or None if we have no valid lease
+        Returns it as string containing a dotted-decimal IPv4 address
+        """
+        with self.status._dhcp_status_mutex:
+            if self.status.ipv4_lease_valid is None:
+                return None
+            else:
+                return self.status.ipv4_dhcpserverid
+            
+            
     def isLeaseValid(self):
         """
         Is the current lease valid?
@@ -557,6 +569,29 @@ class DhcpClientLibrary:
         else:
             return unicode(ipv4_defaultgw)
     
+        
+    def get_serverid(self):
+        """ Alias for Get Ipv4 Serverid
+        """
+        return self.get_ipv4_serverid()
+    
+    def get_ipv4_serverid(self):
+        """ Get the IPv4 default gateway for the current lease or ${None} if we have no currently valid lease
+        
+        Return the IPv4 default gateway (as a string containing its dotted decimal notation, eg: '192.168.0.1'
+        
+        Example:
+        | Get Ipv4 Serverid |
+        =>
+        | ${ipv4_serverid} |
+        """
+        
+        ipv4_serverid = self._dhcp_client_ctrl.getIpv4DhcpServerId()
+        if ipv4_serverid is None:
+            return None
+        else:
+            return unicode(ipv4_serverid)
+        
         
     def get_dns_list(self):
         """ Alias for Get Ipv4 Dns List

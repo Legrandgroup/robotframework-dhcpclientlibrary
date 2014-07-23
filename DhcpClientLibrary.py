@@ -571,7 +571,7 @@ class DhcpClientLibrary:
         ipv4_dns_list = self._dhcp_client_ctrl.getIpv4DnsList()
         if ipv4_dns_list is None:
             return [None]
-        else
+        else:
             return map(unicode, ipv4_dns_list)
         
         

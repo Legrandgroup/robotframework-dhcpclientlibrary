@@ -130,8 +130,9 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		
 		self._parameter_list = None	# DHCP Parameter request list (options requested from the DHCP server)
 		
-		self._random = None
-		
+		self._random = random.Random()
+		self._random.seed()
+
 		self._renew_thread = None
 		self._release_thread = None
 		
@@ -360,10 +361,6 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		It can be retrieved using getXid()
 		"""
 		with self._xid_mutex:
-			if self._random is None:
-				self._random = random.Random()
-				self._random.seed()
-	
 			self._current_xid = self._random.randint(0,0xffffffff)
 	
 	def _getXitAsDhcpOption(self):

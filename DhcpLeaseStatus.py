@@ -3,6 +3,12 @@ import threading
 class DhcpLeaseStatus:
     """
     This object represents a DHCP lease status database
+    Note: all IPv4 address stored here should be done using type str
+    Exceptions to this is:
+    - ipv4_lease_valid is of type boolean
+    - ipv4_lease_duration is of type int (representing a duration in seconds)
+    - ipv4_lease_remaining is of type int (representing a duration in seconds)
+    - ipv4_lease_expiry is of type time.struct_time object
     """
 
     def __init__(self):

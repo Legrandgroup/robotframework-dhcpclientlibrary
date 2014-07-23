@@ -5,6 +5,7 @@ from __future__ import print_function
 
 import sys
 import os
+import signal
 
 import gobject
 import dbus
@@ -37,6 +38,7 @@ import DhcpLeaseStatus
 progname = os.path.basename(sys.argv[0])
 
 main_lock = None	# FileLock object used to force only one DHCP client instance on a given network interface
+client = None	# Global instance of DHCP client
 
 VERSION = '1.0.0'
 
@@ -97,10 +99,25 @@ def cleanupAtExit():
     global main_lock
     
     if main_lock and main_lock.i_am_locking():
-		print('Releasing lock file')
+		print(progname + ': Releasing lock file', file=sys.stderr)
 		main_lock.release()
 		main_lock = None
 
+def signalHandler(signum, frame):
+	"""
+	Called when receiving a UNIX signal
+	Will only terminate if receiving a SIGINT or SIGTERM, otherwise, just ignore the signal
+	"""
+	global client
+	
+	if signum == signal.SIGINT or signum == signal.SIGTERM:
+		cleanupAtExit()
+		if not client is None:
+			print(progname + ': Got signal ' + str(signum) + '. We have one client object to terminate... doing it now', file=sys.stderr)
+			client.exit()
+			client = None
+	else:
+		print(progname + ': Ignoring signal ' + str(signum), file=sys.stderr)
 
 class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 	def __init__(self, conn, dbus_loop, object_path=DBUS_OBJECT_PATH, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, apply_ip = False, dump_packets = False, silent_mode = False, **kwargs):
@@ -250,7 +267,6 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		Cleanup object and stop all threads
 		"""
 		self.sendDhcpRelease()	# Release our current lease if any (this will also clear all DHCP-lease-related threads)
-
 		self._dbus_loop.quit()	# Stop the D-Bus main loop
 		if not self._on_exit_callback is None:
 			self._on_exit_callback() 
@@ -263,16 +279,12 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		return (int(os.getpid()))
 
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
-	def Exit(self):
+	def Release(self):
 		"""
-		D-Bus method to stop the DHCP client
+		D-Bus method to release our current DHCP lease
 		"""
-		if not self._silent_mode: print("Received Exit() command from D-Bus")
-		# Instead of calling directly self.exit(), we setup a thread that will perform a call to self.exit() after we return from this decorated method.
-		# This allows us to return from here and thus acknowledge the D-Bus call to the caller, before stopping the D-Bus mainloop
-		exit_thread = threading.Timer(0.1, self.exit, [])
-		#exit_thread.setDaemon(True)
-		exit_thread.start()
+		if not self._silent_mode: print("Received Release() command from D-Bus")
+		self.sendDhcpRelease()
 
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
 	def Discover(self):
@@ -705,7 +717,7 @@ if __name__ == '__main__':
 	
 	parser = argparse.ArgumentParser(description="This program launches a DHCP client daemon. \
 It will report every DHCP client state change via D-Bus signal. \
-It will also accept D-Bus method calls to change its behaviour (see Exit(), Renew(), Restart() and FreezeRenew() methods.", prog=progname)
+It will also accept D-Bus method calls to change its behaviour (see Discover(), Renew(), Restart(), Release() etc... methods.", prog=progname)
 	parser.add_argument('-i', '--ifname', type=str, help='network interface on which to send/receive DHCP packets', required=True)
 	parser.add_argument('-A', '--applyconfig', action='store_true', help='apply the IP config (ip address, netmask and default gateway) to the interface when lease is obtained')
 	parser.add_argument('-D', '--dumppackets', action='store_true', help='dump received packets content', default=False)
@@ -721,6 +733,9 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 	
 	lockfilename = '/var/lock/' + progname + '.' + args.ifname
 	
+	signal.signal(signal.SIGINT, signalHandler)	# Install a cleanup handler on SIGINT and SIGTERM
+	signal.signal(signal.SIGTERM, signalHandler)
+	
 	main_lock = lockfile.FileLock(lockfilename)
 	try:
 		main_lock.acquire(timeout = 0)
@@ -733,7 +748,14 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 		
 		try:
 			while True:	client.GetNextDhcpPacket()	# Handle incoming DHCP packets
+		except select.error as ex:	# Catch select error 4 (interrupted system call)
+			if ex[0] == 4:
+				print(progname + ': Terminating', file=sys.stderr)
+			else:
+				raise  
 		finally:
-			client.exit()
+			if not client is None:
+				client.exit()
+			client = None
 	except lockfile.AlreadyLocked:
 		print(progname + ': Error: Could not get lock on file ' + lockfilename + '.lock', file=sys.stderr)

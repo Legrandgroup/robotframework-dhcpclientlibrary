@@ -94,7 +94,6 @@ def cleanupAtExit():
     
     global main_lock
     
-    print('in cleanupAtExit()')
     if main_lock and main_lock.i_am_locking():
 		print('Releasing lock file')
 		main_lock.release()
@@ -256,7 +255,14 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 
 		self._dbus_loop.quit()	# Stop the D-Bus main loop
 		if not self._on_exit_callback is None:
-			self._on_exit_callback()
+			self._on_exit_callback() 
+
+	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='i')
+	def GetPid(self):
+		"""
+		D-Bus method to output the PID of this process
+		"""
+		return (int(os.getpid()))
 
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
 	def Exit(self):
@@ -264,7 +270,11 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		D-Bus method to stop the DHCP client
 		"""
 		if not self._silent_mode: print("Received Exit() command from D-Bus")
-		self.exit()	# Inherited dbus.service.Ibject has virtual methods written with an initial capital, so wrap around it to use our method naming convention
+		# Instead of calling directly self.exit(), we setup a thread that will perform a call to self.exit() after we return from this decorated method.
+		# This allows us to return from here and thus acknowledge the D-Bus call to the caller, before stopping the D-Bus mainloop
+		exit_thread = threading.Timer(0.1, self.exit, [])
+		#exit_thread.setDaemon(True)
+		exit_thread.start()
 
 	@dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='')
 	def Discover(self):
@@ -542,6 +552,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if bytes_sent == 0:
 			raise Exception('FailedSendDhcpPacketTo')
 		self._renew_thread = threading.Timer(self._last_leasetime / 6, self.sendDhcpRenew, [])	# After the first renew is sent, increase the frequency of the next renew packets
+		self._renew_thread.setDaemon(True)
 		self._renew_thread.start()
 
 	
@@ -646,8 +657,10 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if not self._release_thread is None: self._release_thread.cancel()	# Cancel the release timeout
 		
 		self._renew_thread = threading.Timer(self._last_leasetime / 2, self.sendDhcpRenew, [])
+		self._renew_thread.setDaemon(True)
 		self._renew_thread.start()
 		self._release_thread = threading.Timer(self._last_leasetime, self.sendDhcpRelease, [])	# Restart the release timeout
+		self._release_thread.setDaemon(True)
 		self._release_thread.start()
 		
 		if self._apply_ip and self._ifname:
@@ -722,13 +735,12 @@ It will also accept D-Bus method calls to change its behaviour (see Exit(), Rene
 	
 	lockfilename = '/var/lock/' + progname + '.' + args.ifname
 	
-	global main_lock
 	main_lock = lockfile.FileLock(lockfilename)
 	try:
 		main_lock.acquire(timeout = 0)
 	
 		client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets, silent_mode = False)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
-		client.setOnExit(exit)
+		#client.setOnExit(exit)
 		
 		if not args.startondbus:
 			client.sendDhcpDiscover()	# Send a DHCP DISCOVER on the network

@@ -44,15 +44,17 @@ def killSubprocessFromPid(pid, log = True):
     args = ['sudo', 'kill', '-SIGINT', str(pid)]    # Send Ctrl+C to slave DHCP client process
     subprocess.call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
             
-    timeout = 1 # Give 1s for slave process to exit
-    while checkPid(pid):  # Loop if slave process is still running
-        time.sleep(0.1)
-        timeout -= 0.1
-        if timeout <= 0:    # We have reached timeout... send a SIGKILL to the slave process to force termination
-            if log: logger.info('Sending SIGKILL to slave PID ' + str(pid))
-            args = ['sudo', 'kill', '-SIGKILL', str(pid)]    # Send Ctrl+C to slave DHCP client process
-            subprocess.call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-            break
+    #===========================================================================
+    # timeout = 1 # Give 1s for slave process to exit
+    # while checkPid(pid):  # Loop if slave process is still running
+    #     time.sleep(0.1)
+    #     timeout -= 0.1
+    #     if timeout <= 0:    # We have reached timeout... send a SIGKILL to the slave process to force termination
+    #         if log: logger.info('Sending SIGKILL to slave PID ' + str(pid))
+    #         args = ['sudo', 'kill', '-SIGKILL', str(pid)]    # Send Ctrl+C to slave DHCP client process
+    #         subprocess.call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+    #         break
+    #===========================================================================
 
 def cleanupAtExit():
     """
@@ -234,19 +236,22 @@ class RemoteDhcpClientControl:
         
     def exit(self):
         """
-        Send an Exit message to the remote DHCP client via D-Bus
+        Terminate the D-Bus control over the remote client
+        This will also ask the remote (via D-Bus) to send a Release message
         """
+        if self._dbus_iface is None:
+            raise Exception('Method invoked on non existing D-Bus interface')
+        self._dbus_iface.Release(reply_handler = self._exitUnlock, error_handler = self._exitUnlock) # Call Exit() but ignore whether it gets acknowledged or not... this is because slave process may terminate before even acknowledge
+        self._exit_unlock_event.wait(timeout = 5) # Give 5s for slave to acknowledge the Exit() D-Bus method call... otherwise, ignore and continue
+        # Once we have instructed the slave to send a Release, we can stop our own D-Bus loop (we won't communicate with the slave anymore)
         # Stop the dbus loop
         if not self._dbus_loop is None:
             self._dbus_loop.quit()
         
-        if self._dbus_iface is None:
-            raise Exception('Method invoked on non existing D-Bus interface')
+        self._dbus_loop = None
         
         logger.debug('Sending Exit() to remote DHCP client')
         self._exit_unlock_event.clear()
-        self._dbus_iface.Exit(reply_handler = self._exitUnlock, error_handler = self._exitUnlock) # Call Exit() but ignore whether it gets acknowledged or not... this is because slave process may terminate before even acknowledge
-        self._exit_unlock_event.wait(timeout = 5) # Give 5s for slave to acknowledge the Exit() D-Bus method call... otherwise, ignore and continue
     
     def sendDiscover(self):
         logger.info('Instructing slave to send DISCOVER')
@@ -438,6 +443,7 @@ class DhcpClientLibrary:
         if not self._slave_dhcp_process is None:
             self._slave_dhcp_process.kill()
         self._new_lease_event.clear()
+        self._dhcp_client_ctrl = None   # Destroy the control object
         self._slave_dhcp_process = None # Destroy the slave DHCP object
         logger.debug('DHCP client stopped on ' + self._ifname)
     

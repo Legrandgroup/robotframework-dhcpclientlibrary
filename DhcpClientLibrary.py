@@ -191,7 +191,7 @@ class RemoteDhcpClientControl:
                     with self._callback_new_lease_mutex:
                         self._callback_new_lease = callback
     
-    def _handleIpConfigApplied(self, interface, ip, netmask, defaultgw, leasetime, dns_space_sep, **kwargs):
+    def _handleIpConfigApplied(self, interface, ip, netmask, defaultgw, leasetime, dns_space_sep, serverid, **kwargs):
         """
         Method called when receiving the IpConfigApplied signal from the slave process
         """
@@ -200,6 +200,7 @@ class RemoteDhcpClientControl:
             self.status.ipv4_address = ip
             self.status.ipv4_netmask = netmask
             self.status.ipv4_defaultgw = defaultgw
+            self.status.ipv4_dhcpserverid = serverid
             self.status.ipv4_lease_valid = True
             self.status.ipv4_lease_duration = leasetime
             self.status.ipv4_lease_expiry = datetime.datetime.now() + datetime.timedelta(seconds = int(leasetime))    # Calculate the time when the lease will expire

@@ -382,8 +382,83 @@ class SlaveDhcpProcess:
         return (not self._slave_dhcp_client_pid is None) and (not self._slave_dhcp_client_proc is None)
         
 class DhcpClientLibrary:
+    """Robot Framework DHCP client Library
 
-    """ Robot Framework DHCP client Library """
+    This library utilizes Python's
+    [http://docs.python.org/2.7/library/subprocess.html|subprocess]
+    module and dbus-python [http://dbus.freedesktop.org/doc/dbus-python/doc/tutorial.html]
+    as well as the Python module [https://docs.python.org/2.7/library/signal.html]
+    
+    The library has following usage:
+
+    - Running a DHCP client on a specific network interface and interact with
+      the DHCP client to instruct it to perform some DHCP actions (DISCOVER,
+      RENEW, RELEASE) or to get informations of the DHCP state machine
+      (current IP address, netmask, DNS, lease duration etc...) 
+
+    == Table of contents ==
+
+    - `Requirement on the test machine`
+    - `Specifying environment to the library`
+    - `Requirements for Setup/Teardown`
+
+    = Requirement on the test machine =
+    
+    A few checks must be performed on the machine on which this library will
+    run :
+    - The D-Bus system bus must have appropriate permissions to allow messages
+    on the BUS `com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary`.
+    For example, the following lines in a file stored in /etc/d-bus-1/system.d
+    would do the job (but you may want to setup more restrictive permissions):
+    <!DOCTYPE busconfig PUBLIC
+    "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+    "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+    <busconfig>
+      <policy context="default">
+        <allow own="com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary"/>
+        <allow send_destination="com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary"/>
+      </policy>
+    </busconfig>
+    
+    - The pybot process must have permissions to run sudo on kill and on
+    the slave DHCP python process (DBusControlledDhcpClient.py)  
+    
+    = Specifying environment to the library =
+    
+    Before being able to run a DHCP client on an interface, this library must
+    be provided with the path to the DHCP client exec (also called slave
+    in this library) that will perform the actual DHCP packet send/receive.
+    This exec should point to DBusControlledDhcpClient.py (executable Python
+    program provided with this library)
+    
+    Also, the network interface on which the DHCP client service will run
+    must be provided either :
+    - when importing the library with the keyword `Library` 
+    - by using the keyword `Set Interface` before using the keyword `Start`
+    - by providing it as an optional argument when using the keyword `Start`
+    
+    
+    = Requirements for Setup/Teardown =
+
+    Whenever `DhcpClientLibrary.Start` is run within a given scope, it is
+    mandatory to make sure than `DhcpClientLibrary.Stop` will also be called
+    before or at Teardownto avoid runnaway DHCP client processes (namely
+    DBusControlledDhcpClient.py)
+    
+
+    = Example =
+
+    | ***** Settings *****
+    | Library    DhcpClientLibrary    DBusControlledDhcpClient.py
+    | Suite Setup    `DhcpClientLibrary.Start`   eth1
+    | Suite Teardown    `DhcpClientLibrary.Stop`
+    |
+    | ***** Test Cases *****
+    | Example
+    |     `DhcpClientLibrary.Set Interface`    eth1
+    |     `DhcpClientLibrary.Wait Lease`     5
+    |     ${temp_scalar}=    `DhcpClientLibrary.Get Ipv4 Defaultgw`
+    """
 
     ROBOT_LIBRARY_DOC_FORMAT = 'ROBOT'
     ROBOT_LIBRARY_SCOPE = 'GLOBAL'
@@ -426,12 +501,15 @@ class DhcpClientLibrary:
         
         return self._ifname
 
-    def start(self):
+    def start(self, ifname = None):
         """Start the DHCP client
         
         Example:
-        | Start |
+        | Start | eth1 |
         """
+        
+        if not ifname is None:
+             self._ifname = ifname
         
         if self._ifname is None:
             raise Exception('NoInterfaceProvided')
@@ -454,10 +532,12 @@ class DhcpClientLibrary:
             self._dhcp_client_ctrl.exit()
         if not self._slave_dhcp_process is None:
             self._slave_dhcp_process.kill()
+            logger.debug('DHCP client stopped on ' + self._ifname)
+        
         self._new_lease_event.clear()
         self._dhcp_client_ctrl = None   # Destroy the control object
         self._slave_dhcp_process = None # Destroy the slave DHCP object
-        logger.debug('DHCP client stopped on ' + self._ifname)
+        
     
     def restart(self):
         """ Restart the DHCP client

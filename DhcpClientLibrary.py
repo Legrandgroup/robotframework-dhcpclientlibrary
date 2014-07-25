@@ -53,10 +53,10 @@ class RemoteDhcpClientControl:
 
     POLL_WAIT = 1 / 100
     DBUS_NAME = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'    # The name of bus we are connecting to on D-Bus
-    DBUS_OBJECT_PATH = '/com/legrandelectric/RobotFrameworkIPC/DhcpClientLibrary'    # The name of the D-Bus object under which we will communicate on D-Bus
+    DBUS_OBJECT_ROOT = '/com/legrandelectric/RobotFrameworkIPC/DhcpClientLibrary'    # The name of the D-Bus object under which we will communicate on D-Bus
     DBUS_SERVICE_INTERFACE = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'    # The name of the D-Bus service under which we will perform input/output on D-Bus
 
-    def __init__(self):
+    def __init__(self, ifname):
         """
         Instanciate a new RemoteDhcpClientControl object that represents a DHCP client remotely-controlled via D-Bus
         This RemoteDhcpClientControl object will mimic the status/methods of the remotely-controlled DHCP client so that we can interact with RemoteDhcpClientControl without any knowledge of the actual remotely-controller DHCP client
@@ -76,7 +76,9 @@ class RemoteDhcpClientControl:
         gobject.threads_init()    # Allow the mainloop to run as an independent thread
         dbus.mainloop.glib.threads_init()
         
-        self._dhcp_client_proxy = self._bus.get_object(RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE, RemoteDhcpClientControl.DBUS_OBJECT_PATH)
+        dbus_object_name = RemoteDhcpClientControl.DBUS_OBJECT_ROOT + '/' + str(ifname)
+        logger.debug('Going to communicate with object ' + dbus_object_name)
+        self._dhcp_client_proxy = self._bus.get_object(RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE, dbus_object_name)
         self._dbus_iface = dbus.Interface(self._dhcp_client_proxy, RemoteDhcpClientControl.DBUS_SERVICE_INTERFACE)
         
         logger.debug("Connected to D-Bus")
@@ -109,7 +111,7 @@ class RemoteDhcpClientControl:
         self._getversion_unlock_event.clear()
         self._remote_version = ''
         slave_version = self._dbus_iface.GetVersion(reply_handler = self._getVersionUnlock, error_handler = self._getVersionError)
-        if not self._getversion_unlock_event.wait(2):   # We give 2s for slave to answer the GetVersion() request
+        if not self._getversion_unlock_event.wait(4):   # We give 4s for slave to answer the GetVersion() request
             raise Exception('TimeoutOnGetVersion')
         else:
             logger.debug('Slave version: ' + self._remote_version)        
@@ -538,10 +540,11 @@ class DhcpClientLibrary:
         
         if self._ifname is None:
             raise Exception('NoInterfaceProvided')
+        
         self._slave_dhcp_process = SlaveDhcpProcess(self._dhcp_client_daemon_exec_path, self._ifname)
         self._slave_dhcp_process.start()
         self._new_lease_event.clear()
-        self._dhcp_client_ctrl = RemoteDhcpClientControl()    # Create a RemoteDhcpClientControl object that symbolizes the control on the remote process (over D-Bus)
+        self._dhcp_client_ctrl = RemoteDhcpClientControl(self._ifname)    # Create a RemoteDhcpClientControl object that symbolizes the control on the remote process (over D-Bus)
         self._dhcp_client_ctrl.notifyNewLease(self._got_new_lease)  # Ask underlying RemoteDhcpClientControl object to call self._new_lease_retrieved() as soon as we get a new lease 
         logger.debug('DHCP client started on ' + self._ifname)
         slave_pid = self._dhcp_client_ctrl.getRemotePid()

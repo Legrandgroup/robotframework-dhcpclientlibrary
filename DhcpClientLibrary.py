@@ -3,8 +3,6 @@
 
 from __future__ import print_function
 
-#from __future__ import division
-
 import os
 import sys
 import threading
@@ -34,41 +32,12 @@ if __name__ == '__main__':
         
         client.stop()
 
-def checkPid(pid):        
-    """
-    Check For the existence of a UNIX PID
-    """
     
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    else:
-        return True
-    
-def killSubprocessFromPid(pid, log = True):
-    """
-    Kill a process from it PID (first send a SIGINT, then at give it a maximum of 1 second to terminate and send a SIGKILL if is still alive after this timeout
-    """
-
-    if log: logger.info('Sending SIGINT to slave PID ' + str(pid))
-    args = ['sudo', 'kill', '-SIGINT', str(pid)]    # Send Ctrl+C to slave DHCP client process
-    subprocess.call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-            
-    #===========================================================================
-    # timeout = 1 # Give 1s for slave process to exit
-    # while checkPid(pid):  # Loop if slave process is still running
-    #     time.sleep(0.1)
-    #     timeout -= 0.1
-    #     if timeout <= 0:    # We have reached timeout... send a SIGKILL to the slave process to force termination
-    #         if log: logger.info('Sending SIGKILL to slave PID ' + str(pid))
-    #         args = ['sudo', 'kill', '-SIGKILL', str(pid)]    # Send Ctrl+C to slave DHCP client process
-    #         subprocess.call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-    #         break
-    #===========================================================================
-
 
 def catchall_signal_handler(*args, **kwargs):
+    """
+    Function used for debugging D-Bus signals only
+    """ 
     print("Caught signal (in catchall handler) " + kwargs['dbus_interface'] + "." + kwargs['member'])
     for arg in args:
         print("        " + str(arg))
@@ -223,7 +192,7 @@ class RemoteDhcpClientControl:
         Callback called when our D-Bus bus owner changes 
         """
         if new_owner == '':
-            logger.warning('No owner anymore for bus name ' + RemoteDhcpClientControl.DBUS_NAME)
+            logger.warn('No owner anymore for bus name ' + RemoteDhcpClientControl.DBUS_NAME)
             raise Exception('LostDhcpSlave')
         else:
             pass # Owner exists
@@ -358,13 +327,46 @@ class SlaveDhcpProcess:
         logger.debug('Adding slave PID ' + str(pid))
         if not pid in self._all_processes_pid:  # Make sure we don't add twice a PID
             self._all_processes_pid += [pid] # Add
-    
-    def kill(self):
+
+    def _checkPid(pid):        
         """
-        Stop add PIDs in the list self._all_processes_pid (that contains the list of all slave processes' PIDs)
+        Check For the existence of a UNIX PID
+        """
+        
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        else:
+            return True
+    
+    def _sudoKillSubprocessFromPid(pid, log = True, force = False, timeout = 1):
+        """
+        Kill a process from it PID (first send a SIGINT)
+        If argument force is set to True, wait a maximum of timeout seconds after SIGINT and send a SIGKILL if is still alive after this timeout
+        """
+
+        if log: logger.info('Sending SIGINT to slave PID ' + str(pid))
+        args = ['sudo', 'kill', '-SIGINT', str(pid)]    # Send Ctrl+C to slave DHCP client process
+        subprocess.call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+        
+        if force:
+            while self._checkPid(pid):  # Loop if slave process is still running
+                time.sleep(0.1)
+                timeout -= 0.1
+                if timeout <= 0:    # We have reached timeout... send a SIGKILL to the slave process to force termination
+                    if log: logger.info('Sending SIGKILL to slave PID ' + str(pid))
+                    args = ['sudo', 'kill', '-SIGKILL', str(pid)]    # Send Ctrl+C to slave DHCP client process
+                    subprocess.call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+                    break
+
+    def killSlavePids(self):
+        """
+        Stop all PIDs stored in the list self._all_processes_pid
+        This list actually contains the list of all recorded slave processes' PIDs
         """
         for pid in self._all_processes_pid:
-            killSubprocessFromPid(pid)
+            self._sudoKillSubprocessFromPid(pid)
             #while pid in self._all_processes_pid: self._all_processes_pid.remove(pid)   # Remove references to this child's PID in the list of children
         self._slave_dhcp_client_proc.wait() # Wait for sudo child (our only direct child)
         
@@ -374,20 +376,35 @@ class SlaveDhcpProcess:
         self._slave_dhcp_client_pid = None    
         self._slave_dhcp_client_proc = None
 
+    def kill(self):
+        """
+        Stop the slave process(es)
+        """
+        
+        self.killSlavePids()
+        
     def isRunning(self):
         """
-        Is the child process currently running 
+        Is/Are the child process(es) currently running 
         """
         if not self.hasBeenStarted():
             return False
         
-        return self._slave_dhcp_client_proc.poll()
+        if not self._slave_dhcp_client_proc.poll(): # Poll our direct child (sudo)
+            return False
+        
+        for pid in self._all_processes_pid:
+            if not self._checkPid(pid):
+                return False
+        
+        return True
     
     def hasBeenStarted(self):
         """
         Has the child process been started by us
         """
         return (not self._slave_dhcp_client_pid is None) and (not self._slave_dhcp_client_proc is None)
+        
         
 class DhcpClientLibrary:
     """Robot Framework DHCP client Library
@@ -765,12 +782,6 @@ if __name__ == '__main__':
     print("Got a lease with IP address " + ip_addr)
     input('Press enter to stop slave')
     client.stop()
-    #assert IP == client.get_ip(MAC, '_http._tcp')
-    #DATA = BL.check_run(IP, '_http._tcp')
-    #BL.get_apname(DATA)
-    #input('Press enter & "Disable UPnP/Bonjour" on web interface')
-    #BL.check_stop(IP, '_http._tcp')
 else:
     from robot.api import logger
-    #import robot.libraries.Process
 

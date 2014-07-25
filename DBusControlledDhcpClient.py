@@ -333,6 +333,14 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
         global VERSION
         return VERSION
     
+    @dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='s')
+    def GetInterface(self):
+        """
+        D-Bus decorated method executed when receiving the D-Bus "GetInterface" message call
+        This method will return the network interface on which this program is acting as a DHCP client.
+        """
+        return self._ifname
+    
     @dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='s', out_signature='')
     def Debug(self, msg):
         """

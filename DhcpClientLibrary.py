@@ -21,7 +21,18 @@ import signal
 
 import DhcpLeaseStatus
 
-all_processes_pid = []  # List of all subprocessed launched by us
+client = None
+
+# This cleanup handler is not used when this library is imported, only when run as standalone
+if __name__ == '__main__':
+    def cleanupAtExit():
+        """
+        Called when this program is terminated, to perform the same cleanup as expected in Teardown when run within Robotframework
+        """
+        
+        global client
+        
+        client.stop()
 
 def checkPid(pid):        
     """
@@ -56,16 +67,6 @@ def killSubprocessFromPid(pid, log = True):
     #         break
     #===========================================================================
 
-def cleanupAtExit():
-    """
-    Called when this program is terminated, to terminate all the subprocesses that are still running
-    """
-    
-    global all_processes_pid
-    
-    for pid in all_processes_pid: # list of your processes
-        logger.warning("Stopping slave PID " + str(pid))
-        killSubprocessFromPid(pid, log = False)
 
 def catchall_signal_handler(*args, **kwargs):
     print("Caught signal (in catchall handler) " + kwargs['dbus_interface'] + "." + kwargs['member'])
@@ -141,14 +142,13 @@ class RemoteDhcpClientControl:
         slave_version = self._dbus_iface.GetVersion(reply_handler = self._getVersionUnlock, error_handler = self._getVersionError)
         if not self._getversion_unlock_event.wait(2):   # We give 2s for slave to answer the GetVersion() request
             raise Exception('TimeoutOnGetVersion')
-        
-        global all_processes_pid
-        slave_pid = self._dbus_iface.GetPid()
-        if slave_pid:
-            all_processes_pid += [slave_pid]
-        logger.debug('Slave has PID ' + str(slave_pid) + ' and version: ' + self._remote_version)
+        else:
+            logger.debug('Slave version: ' + self._remote_version)        
         
     # D-Bus-related methods
+    def getRemotePid(self):
+        return self._dbus_iface.GetPid()
+    
     def _loopHandleDbus(self):
         """
         This method should be run within a thread... This thread's aim is to run the Glib's main loop while the main thread does other actions in the meantime
@@ -337,32 +337,39 @@ class SlaveDhcpProcess:
         self._slave_dhcp_client_pid = None
         self._ifname = ifname
         self._log = log
+        self._all_processes_pid = []  # List of all subprocessed launched by us
     
     def start(self):
         """
         Start the slave process
         """
-        try:
-            global all_processes_pid    # This process's list of child PIDs (global variable)
-            cmd = ['sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A', '-S']
-            logger.debug('Running command ' + str(cmd))
-            self._slave_dhcp_client_proc = subprocess.Popen(cmd)#, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-            self._slave_dhcp_client_pid = self._slave_dhcp_client_proc.pid
-            all_processes_pid += [self._slave_dhcp_client_proc.pid] # Add the PID of the child to the list of subprocesses (note: we get sudo's PID here, not the slave PID, that we will get later on via D-Bus (see RemoteDhcpClientControl.__init__)
-        except:
-            raise   # Reraise exception exception handling
+        cmd = ['sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A', '-S']
+        logger.debug('Running command ' + str(cmd))
+        #self._slave_dhcp_client_proc = robot.libraries.Process.Process()
+        #self._slave_dhcp_client_proc.start_process('sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A', '-S')
+        self._slave_dhcp_client_proc = subprocess.Popen(cmd)#, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+        self._slave_dhcp_client_pid = self._slave_dhcp_client_proc.pid
+        self.addSlavePid(self._slave_dhcp_client_proc.pid) # Add the PID of the child to the list of subprocesses (note: we get sudo's PID here, not the slave PID, that we will get later on via D-Bus (see RemoteDhcpClientControl.getPid())
+        
+    def addSlavePid(self, pid):
+        """
+        Add a (child) PID to the list of PIDs that we should terminate when kill() is run
+        """
+        logger.debug('Adding slave PID ' + str(pid))
+        if not pid in self._all_processes_pid:  # Make sure we don't add twice a PID
+            self._all_processes_pid += [pid] # Add
     
     def kill(self):
         """
-        Stop the slave process
+        Stop add PIDs in the list self._all_processes_pid (that contains the list of all slave processes' PIDs)
         """
-        global all_processes_pid    # This process's list of child PIDs (global variable)
-        if not self.isRunning():
-            if self._log: logger.debug('Slave PID ' + str(self._slave_dhcp_client_pid) + ' has already terminated')
-            while self._slave_dhcp_client_pid in all_processes_pid: all_processes_pid.remove(self._slave_dhcp_client_pid)   # Remove references to this child's PID in the list of children
-        else:
-            killSubprocessFromPid(self._slave_dhcp_client_pid)
-            self._slave_dhcp_client_proc.wait()
+        for pid in self._all_processes_pid:
+            killSubprocessFromPid(pid)
+            #while pid in self._all_processes_pid: self._all_processes_pid.remove(pid)   # Remove references to this child's PID in the list of children
+        self._slave_dhcp_client_proc.wait() # Wait for sudo child (our only direct child)
+        
+        self._all_processes_pid = []    # Empty our list of PIDs
+        #self._slave_dhcp_client_proc.terminate_all_processes()
         
         self._slave_dhcp_client_pid = None    
         self._slave_dhcp_client_proc = None
@@ -520,6 +527,14 @@ class DhcpClientLibrary:
         self._dhcp_client_ctrl = RemoteDhcpClientControl()    # Create a RemoteDhcpClientControl object that symbolizes the control on the remote process (over D-Bus)
         self._dhcp_client_ctrl.notifyNewLease(self._got_new_lease)  # Ask underlying RemoteDhcpClientControl object to call self._new_lease_retrieved() as soon as we get a new lease 
         logger.debug('DHCP client started on ' + self._ifname)
+        slave_pid = self._dhcp_client_ctrl.getRemotePid()
+        if slave_pid is None:
+            logger.error('Could not get remote process PID')
+            raise('RemoteCommunicationError')
+        else:
+            logger.debug('Slave has PID ' + str(slave_pid))        
+            self._slave_dhcp_process.addSlavePid(slave_pid)
+
         self._dhcp_client_ctrl.sendDiscover()
         
     def stop(self):
@@ -757,4 +772,5 @@ if __name__ == '__main__':
     #BL.check_stop(IP, '_http._tcp')
 else:
     from robot.api import logger
+    #import robot.libraries.Process
 

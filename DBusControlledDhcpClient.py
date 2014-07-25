@@ -120,7 +120,7 @@ def signalHandler(signum, frame):
 		print(progname + ': Ignoring signal ' + str(signum), file=sys.stderr)
 
 class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
-    def __init__(self, conn, dbus_loop, object_root=DBUS_OBJECT_ROOT, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, apply_ip = False, dump_packets = False, silent_mode = False, **kwargs):
+    def __init__(self, conn, dbus_loop, object_name=DBUS_OBJECT_ROOT, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, apply_ip = False, dump_packets = False, silent_mode = False, **kwargs):
         """
         Instanciate a new DBusControlledDhcpClient client bound to ifname (if specified) or a specific interface address listen_address (if specified)
         Client listening UDP port and server destination UDP port can also be overridden from their default values
@@ -129,13 +129,8 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
         # Note: **kwargs is here to make this contructor more generic (it will however force args to be named, but this is anyway good practice) and is a step towards efficient mutliple-inheritance with Python new-style-classes
         DhcpClient.__init__(self, ifname = ifname, listen_address = listen_address, client_listen_port = client_port, server_listen_port = server_port)
         if not ifname is None:
-            object_root += '/' + str(ifname)    # Add /eth0 to object PATH if ifname is 'eth0'
-        dbus.service.Object.__init__(self, conn, object_root)
-        
-        if isinstance(conn, dbus.Bus):   # conn should be a Bus instance in the new API
-            conn.add_signal_receiver(self._handleTerminate, 'Terminate', DBUS_SERVICE_INTERFACE, DBUS_NAME)            #BUS_DAEMON_PATH, arg0=bus_name)
-        else:
-            raise('UnsupportedConnType')
+            object_name += '/' + str(ifname)    # Add /eth0 to object PATH if ifname is 'eth0'
+        dbus.service.Object.__init__(self, conn, object_name)
         
         if ifname:
             self.BindToDevice()
@@ -205,20 +200,6 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
         if not self._silent_mode: print('Starting dbus mainloop')
         self._dbus_loop.run()
         if not self._silent_mode: print('Stopping dbus mainloop')
-    
-    #===========================================================================
-    # @dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
-    # def Terminate(self, msg):
-    #     """ example of signal receiver
-    #     """
-    #     print msg
-    #===========================================================================
-        
-    def _handleTerminate(self):
-        """
-        This method is called when we receive a Terminate signal on D-Bus
-        """
-        if not self._silent_mode: print('Received Terminate signal from D-Bus')
     
     @dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
     def DhcpDiscoverSent(self):

@@ -14,7 +14,7 @@ class DhcpLeaseStatus:
     """
 
     def __init__(self):
-        self._dhcp_status_mutex = threading.Lock()    # This mutex protects writes to any of the variables of this object
+        self._dhcp_status_mutex = threading.RLock()    # This re-intrant mutex protects writes to any of the variables of this object
         self.reset()
 
     def __repr__(self):

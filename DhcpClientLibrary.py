@@ -21,7 +21,7 @@ import DhcpLeaseStatus
 
 client = None
 
-# This cleanup handler is not used when this library is imported, only when run as standalone
+# This cleanup handler is not used when this library is imported in RF, only when run as standalone
 if __name__ == '__main__':
     def cleanupAtExit():
         """
@@ -340,7 +340,7 @@ class SlaveDhcpProcess:
         else:
             return True
     
-    def _sudoKillSubprocessFromPid(pid, log = True, force = False, timeout = 1):
+    def _sudoKillSubprocessFromPid(self, pid, log = True, force = False, timeout = 1):
         """
         Kill a process from it PID (first send a SIGINT)
         If argument force is set to True, wait a maximum of timeout seconds after SIGINT and send a SIGKILL if is still alive after this timeout
@@ -367,11 +367,11 @@ class SlaveDhcpProcess:
         """
         for pid in self._all_processes_pid:
             self._sudoKillSubprocessFromPid(pid)
+            # The code below is commented out, we will just wipe out the whole  self._all_processes_pid[] list below
             #while pid in self._all_processes_pid: self._all_processes_pid.remove(pid)   # Remove references to this child's PID in the list of children
         self._slave_dhcp_client_proc.wait() # Wait for sudo child (our only direct child)
         
         self._all_processes_pid = []    # Empty our list of PIDs
-        #self._slave_dhcp_client_proc.terminate_all_processes()
         
         self._slave_dhcp_client_pid = None    
         self._slave_dhcp_client_proc = None

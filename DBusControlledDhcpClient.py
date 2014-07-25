@@ -130,6 +130,11 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		DhcpClient.__init__(self, ifname = ifname, listen_address = listen_address, client_listen_port = client_port, server_listen_port = server_port)
 		dbus.service.Object.__init__(self, conn, object_path)
 		
+		if isinstance(conn, dbus.Bus):   # conn should be a Bus instance in the new API
+			conn.add_signal_receiver(self._handleTerminate, 'Terminate', DBUS_SERVICE_INTERFACE, DBUS_NAME)			#BUS_DAEMON_PATH, arg0=bus_name)
+		else:
+			raise('UnsupportedConnType')
+		
 		if ifname:
 			self.BindToDevice()
 		if listen_address != '0.0.0.0' and listen_address != '::':	# 0.0.0.0 and :: are addresses any in IPv4 and IPv6 respectively
@@ -198,6 +203,12 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		if not self._silent_mode: print("Starting dbus mainloop")
 		self._dbus_loop.run()
 		if not self._silent_mode: print("Stopping dbus mainloop")
+	
+	def _handleTerminate(self):
+		"""
+		This method is called when we receive a Terminate signal on D-Bus
+		"""
+		print("Got Terminate signal")
 	
 	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpDiscoverSent(self):

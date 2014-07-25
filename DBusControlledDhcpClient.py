@@ -113,7 +113,7 @@ def signalHandler(signum, frame):
 	if signum == signal.SIGINT or signum == signal.SIGTERM:
 		cleanupAtExit()
 		if not client is None:
-			print(progname + ': Got signal ' + str(signum) + '. We have one client object to terminate... doing it now', file=sys.stderr)
+			print(progname + ': Got signal ' + str(signum) + '. We have a client object instance to stop... doing it now', file=sys.stderr)
 			client.exit()
 			client = None
 	else:
@@ -200,15 +200,15 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
 		This method should be run within a thread... This thread's aim is to run the Glib's main loop while the main thread does other actions in the meantime
 		This methods will loop infinitely to receive and send D-Bus messages and will only stop looping when the value of self._loopDbus is set to False (or when the Glib's main loop is stopped using .quit()) 
 		"""
-		if not self._silent_mode: print("Starting dbus mainloop")
+		if not self._silent_mode: print('Starting dbus mainloop')
 		self._dbus_loop.run()
-		if not self._silent_mode: print("Stopping dbus mainloop")
+		if not self._silent_mode: print('Stopping dbus mainloop')
 	
 	def _handleTerminate(self):
 		"""
 		This method is called when we receive a Terminate signal on D-Bus
 		"""
-		print("Got Terminate signal")
+		if not self._silent_mode: print('Received Terminate signal from D-Bus')
 	
 	@dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
 	def DhcpDiscoverSent(self):

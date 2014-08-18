@@ -51,14 +51,13 @@ class RemoteDhcpClientControl:
     Will will communicate with this slave using D-Bus Methods and catch the D-Bus signals it emits
     """
 
-    POLL_WAIT = 1 / 100
     DBUS_NAME = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'    # The name of bus we are connecting to on D-Bus
     DBUS_OBJECT_ROOT = '/com/legrandelectric/RobotFrameworkIPC/DhcpClientLibrary'    # The name of the D-Bus object under which we will communicate on D-Bus
     DBUS_SERVICE_INTERFACE = 'com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary'    # The name of the D-Bus service under which we will perform input/output on D-Bus
 
     def __init__(self, ifname):
         """
-        Instanciate a new RemoteDhcpClientControl object that represents a DHCP client remotely-controlled via D-Bus
+        Instantiate a new RemoteDhcpClientControl object that represents a DHCP client remotely-controlled via D-Bus
         This RemoteDhcpClientControl object will mimic the status/methods of the remotely-controlled DHCP client so that we can interact with RemoteDhcpClientControl without any knowledge of the actual remotely-controller DHCP client
         """
 
@@ -69,7 +68,7 @@ class RemoteDhcpClientControl:
         while not self._bus.name_has_owner(RemoteDhcpClientControl.DBUS_NAME):
             time.sleep(0.2)
             wait_bus_owner_timeout -= 0.2
-            if wait_bus_owner_timeout <= 0: # We timeout without having an ower for the expected bus name
+            if wait_bus_owner_timeout <= 0: # We timeout without having an owner for the expected bus name
                 raise Exception('No owner found for bus name ' + RemoteDhcpClientControl.DBUS_NAME)
         
         logger.debug('Got an owner for bus name ' + RemoteDhcpClientControl.DBUS_NAME)

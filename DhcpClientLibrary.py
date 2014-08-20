@@ -109,7 +109,7 @@ class RemoteDhcpClientControl:
 
         self._getversion_unlock_event.clear()
         self._remote_version = ''
-        slave_version = self._dbus_iface.GetVersion(reply_handler = self._getVersionUnlock, error_handler = self._getVersionError)
+        self._dbus_iface.GetVersion(reply_handler = self._getVersionUnlock, error_handler = self._getVersionError)
         if not self._getversion_unlock_event.wait(4):   # We give 4s for slave to answer the GetVersion() request
             raise Exception('TimeoutOnGetVersion')
         else:
@@ -292,7 +292,7 @@ class RemoteDhcpClientControl:
             return self.status.ipv4_lease_valid
                 
 
-class SlaveDhcpProcess:
+class SlaveDhcpClientProcess:
     """
     Slave DHCP client process manipulation
     This class allows to run a DHCP client subprocess as root, and to terminate it
@@ -329,7 +329,7 @@ class SlaveDhcpProcess:
         if not pid in self._all_processes_pid:  # Make sure we don't add twice a PID
             self._all_processes_pid += [pid] # Add
 
-    def _checkPid(pid):        
+    def _checkPid(self, pid):        
         """
         Check For the existence of a UNIX PID
         """
@@ -370,7 +370,8 @@ class SlaveDhcpProcess:
             self._sudoKillSubprocessFromPid(pid)
             # The code below is commented out, we will just wipe out the whole  self._all_processes_pid[] list below
             #while pid in self._all_processes_pid: self._all_processes_pid.remove(pid)   # Remove references to this child's PID in the list of children
-        self._slave_dhcp_client_proc.wait() # Wait for sudo child (our only direct child)
+        if not self._slave_dhcp_server_proc is None:
+            self._slave_dhcp_server_proc.wait() # Wait for sudo child (our only direct child)
         
         self._all_processes_pid = []    # Empty our list of PIDs
         
@@ -498,7 +499,7 @@ class DhcpClientLibrary:
         self._dhcp_client_daemon_exec_path = dhcp_client_daemon_exec_path
         self._ifname = ifname
         self._slave_dhcp_process = None
-        self._dhcp_client_ctrl = None    # Slave process not started
+        self._dhcp_client_ctrl = None    # Slave DHCP client process not started
         self._new_lease_event = threading.Event() # At initialisation, event is cleared
         
     def set_interface(self, ifname):
@@ -506,7 +507,7 @@ class DhcpClientLibrary:
         This must be done prior to calling Start on the DHCP client
         
         Example:
-        | Set Interface | 'eth0' |
+        | Set Interface | eth0 |
         """
         
         if not self._slave_dhcp_process is None:
@@ -519,7 +520,7 @@ class DhcpClientLibrary:
         Will return None if no interface has been configured yet
         
         Example:
-        | Set Interface | 'eth0' |
+        | Set Interface | eth0 |
         | Get Interface |
         =>
         | 'eth0' |
@@ -540,7 +541,7 @@ class DhcpClientLibrary:
         if self._ifname is None:
             raise Exception('NoInterfaceProvided')
         
-        self._slave_dhcp_process = SlaveDhcpProcess(self._dhcp_client_daemon_exec_path, self._ifname)
+        self._slave_dhcp_process = SlaveDhcpClientProcess(self._dhcp_client_daemon_exec_path, self._ifname)
         self._slave_dhcp_process.start()
         self._new_lease_event.clear()
         self._dhcp_client_ctrl = RemoteDhcpClientControl(self._ifname)    # Create a RemoteDhcpClientControl object that symbolizes the control on the remote process (over D-Bus)

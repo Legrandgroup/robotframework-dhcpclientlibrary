@@ -313,6 +313,8 @@ class SlaveDhcpClientProcess:
         """
         Start the slave process
         """
+        if self.isRunning():
+            raise Exception('DhcpClientAlreadyStarted')
         cmd = ['sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A', '-S']
         logger.debug('Running command ' + str(cmd))
         #self._slave_dhcp_client_proc = robot.libraries.Process.Process()
@@ -370,8 +372,8 @@ class SlaveDhcpClientProcess:
             self._sudoKillSubprocessFromPid(pid)
             # The code below is commented out, we will just wipe out the whole  self._all_processes_pid[] list below
             #while pid in self._all_processes_pid: self._all_processes_pid.remove(pid)   # Remove references to this child's PID in the list of children
-        if not self._slave_dhcp_server_proc is None:
-            self._slave_dhcp_server_proc.wait() # Wait for sudo child (our only direct child)
+        if not self._slave_dhcp_client_proc is None:
+            self._slave_dhcp_client_proc.wait() # Wait for sudo child (our only direct child)
         
         self._all_processes_pid = []    # Empty our list of PIDs
         
@@ -494,7 +496,7 @@ class DhcpClientLibrary:
     def __init__(self, dhcp_client_daemon_exec_path, ifname = None):
         """Initialise the library
         dhcp_client_daemon_exec_path is a PATH to the executable program that run the D-Bus controlled DHCP client (will be run as root via sudo)
-        ifname is the interface on which we will act as a DHCP client. If not provided, it will be mandatory to set it using Set Interface and before running Start
+        ifname is the interface on which we will act as a DHCP client. If not provided, it will be mandatory to set it using Set Interface and before (or when) running Start
         """
         self._dhcp_client_daemon_exec_path = dhcp_client_daemon_exec_path
         self._ifname = ifname
@@ -504,7 +506,7 @@ class DhcpClientLibrary:
         
     def set_interface(self, ifname):
         """Set the interface on which the DHCP client will act
-        This must be done prior to calling Start on the DHCP client
+        This must be done prior (or when) the Start keyword is called or subsequent actions will fail
         
         Example:
         | Set Interface | eth0 |
@@ -534,6 +536,9 @@ class DhcpClientLibrary:
         Example:
         | Start | eth1 |
         """
+        
+        if not self._slave_dhcp_process is None:
+            raise Exception('DhcpClientAlreadyStarted')
         
         if not ifname is None:
              self._ifname = ifname

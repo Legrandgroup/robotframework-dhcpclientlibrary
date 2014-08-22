@@ -471,7 +471,7 @@ class DhcpClientLibrary:
 
     Whenever `DhcpClientLibrary.Start` is run within a given scope, it is
     mandatory to make sure than `DhcpClientLibrary.Stop` will also be called
-    before or at Teardownto avoid runnaway DHCP client processes (namely
+    before or at Teardown to avoid runaway DHCP client processes (namely
     DBusControlledDhcpClient.py)
     
 

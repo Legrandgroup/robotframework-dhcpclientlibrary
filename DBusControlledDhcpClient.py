@@ -120,7 +120,7 @@ def signalHandler(signum, frame):
 		print(progname + ': Ignoring signal ' + str(signum), file=sys.stderr)
 
 class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
-    def __init__(self, conn, dbus_loop, object_name=DBUS_OBJECT_ROOT, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, apply_ip = False, dump_packets = False, silent_mode = False, **kwargs):
+    def __init__(self, conn, dbus_loop, object_name=DBUS_OBJECT_ROOT, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, apply_ip = False, dump_packets = False, silent_mode = True, **kwargs):
         """
         Instanciate a new DBusControlledDhcpClient client bound to ifname (if specified) or a specific interface address listen_address (if specified)
         Client listening UDP port and server destination UDP port can also be overridden from their default values
@@ -749,8 +749,8 @@ It will also accept D-Bus method calls to change its behaviour (see Discover(), 
 	main_lock = lockfile.FileLock(lockfilename)
 	try:
 		main_lock.acquire(timeout = 0)
-	
-		client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets, silent_mode = False)	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
+		
+		client = DBusControlledDhcpClient(ifname = args.ifname, conn = system_bus, dbus_loop = gobject.MainLoop(), apply_ip = args.applyconfig, dump_packets = args.dumppackets, silent_mode = (not args.debug))	# Instanciate a dhcpClient (incoming packets will start getting processing starting from now...)
 		#client.setOnExit(exit)
 		
 		if not args.startondbus:

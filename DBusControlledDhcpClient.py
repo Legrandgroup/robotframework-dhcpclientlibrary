@@ -422,7 +422,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
             if self._ifname:
                 cmdline = ['ifdown', str(self._ifname)]
                 if not self._silent_mode: print(cmdline)
-                subprocess.call(cmdline)
+                subprocess.call(cmdline, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
                 time.sleep(0.2)    # Grrrr... on some implementations, ifdown returns too early (before actually doing its job)
                 cmdline = ['ifconfig', str(self._ifname), '0.0.0.0', 'down']    # Make sure we get rid of the IP address
                 if not self._silent_mode: print(cmdline)

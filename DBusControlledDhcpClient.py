@@ -99,7 +99,7 @@ def cleanupAtExit():
     global main_lock
     
     if main_lock and main_lock.i_am_locking():
-		print(progname + ': Releasing lock file', file=sys.stderr)
+		#print(progname + ': Releasing lock file', file=sys.stderr)
 		main_lock.release()
 		main_lock = None
 
@@ -113,11 +113,12 @@ def signalHandler(signum, frame):
 	if signum == signal.SIGINT or signum == signal.SIGTERM:
 		cleanupAtExit()
 		if not client is None:
-			print(progname + ': Got signal ' + str(signum) + '. We have a client object instance to stop... doing it now', file=sys.stderr)
+			#print(progname + ': Got signal ' + str(signum) + '. We have a client object instance to stop... doing it now', file=sys.stderr)
 			client.exit()
 			client = None
 	else:
-		print(progname + ': Ignoring signal ' + str(signum), file=sys.stderr)
+		#print(progname + ': Ignoring signal ' + str(signum), file=sys.stderr)
+		pass
 
 class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
     def __init__(self, conn, dbus_loop, object_name=DBUS_OBJECT_ROOT, ifname = None, listen_address = '0.0.0.0', client_port = 68, server_port = 67, mac_addr = None, apply_ip = False, dump_packets = False, silent_mode = True, **kwargs):
@@ -760,7 +761,8 @@ It will also accept D-Bus method calls to change its behaviour (see Discover(), 
 			while True:	client.GetNextDhcpPacket()	# Handle incoming DHCP packets
 		except select.error as ex:	# Catch select error 4 (interrupted system call)
 			if ex[0] == 4:
-				print(progname + ': Terminating', file=sys.stderr)
+				#print(progname + ': Terminating', file=sys.stderr)
+				pass
 			else:
 				raise  
 		finally:

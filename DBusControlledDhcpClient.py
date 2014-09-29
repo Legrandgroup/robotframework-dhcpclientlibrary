@@ -429,7 +429,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
                 subprocess.call(cmdline)
                 cmdline = ['ifup', str(self._ifname)]
                 if not self._silent_mode: print(cmdline)
-                subprocess.call(cmdline)
+                subprocess.call(cmdline, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
                 self._iface_modified = False
 
     def sendDhcpDiscover(self, parameter_list = None, release = True):

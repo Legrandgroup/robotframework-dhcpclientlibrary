@@ -19,6 +19,8 @@ import signal
 
 import DhcpLeaseStatus
 
+import tempfile # Temporary to debug TimeoutOnGetVersion
+
 client = None
 
 # This cleanup handler is not used when this library is imported in RF, only when run as standalone
@@ -110,7 +112,15 @@ class RemoteDhcpClientControl:
         self._getversion_unlock_event.clear()
         self._remote_version = ''
         self._dbus_iface.GetVersion(reply_handler = self._getVersionUnlock, error_handler = self._getVersionError)
-        if not self._getversion_unlock_event.wait(4):   # We give 4s for slave to answer the GetVersion() request
+        if not self._getversion_unlock_event.wait(10):   # We give 10s for slave to answer the GetVersion() request
+            logfile = tempfile.NamedTemporaryFile(prefix='TimeoutOnGetVersion-', suffix='.log', delete=False)
+            if logfile:
+                print('Saving TimeoutOnGetVersion environment dump to file "' + logfile.name + '"', file=sys.stderr)
+                print('TimeoutOnGetVersion', file=logfile)
+                subprocess.call('ps -ef', stdout=logfile, shell=True)
+                subprocess.call('perl ./dbus-introspect.pl --system com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary /com/legrandelectric/RobotFrameworkIPC/DhcpClientLibrary/eth1', stdout=logfile, shell=True)
+                subprocess.call('dbus-send --system --type=method_call --print-reply --dest=com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary /com/legrandelectric/RobotFrameworkIPC/DhcpClientLibrary/eth1 com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary.GetVersion', stdout=logfile, shell=True)
+                logfile.close()
             raise Exception('TimeoutOnGetVersion')
         else:
             logger.debug('Slave version: ' + self._remote_version)        

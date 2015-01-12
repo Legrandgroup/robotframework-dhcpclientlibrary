@@ -663,7 +663,7 @@ class DhcpClientLibrary:
     def get_ipv4_netmask(self):
         """ Get the IPv4 netmask for the current lease or ${None} if we have no currently valid lease
         
-        Return the IPv4 netmask (as a string containing its dotted decimal notation, eg: '255.255.255.0'
+        Return the IPv4 netmask (as a string containing its dotted decimal notation, eg: '255.255.255.0')
         
         Example:
         | Get Ipv4 Netmask |
@@ -686,7 +686,7 @@ class DhcpClientLibrary:
     def get_ipv4_defaultgw(self):
         """ Get the IPv4 default gateway for the current lease or ${None} if we have no currently valid lease
         
-        Return the IPv4 default gateway (as a string containing its dotted decimal notation, eg: '192.168.0.1'
+        Return the IPv4 default gateway (as a string containing its dotted decimal notation, eg: '192.168.0.1')
         
         Example:
         | Get Ipv4 DefaultGw |
@@ -707,9 +707,9 @@ class DhcpClientLibrary:
         return self.get_ipv4_serverid()
     
     def get_ipv4_serverid(self):
-        """ Get the IPv4 default gateway for the current lease or ${None} if we have no currently valid lease
+        """ Get the IPv4 DHCP server ID for the current lease or ${None} if we have no currently valid lease
         
-        Return the IPv4 default gateway (as a string containing its dotted decimal notation, eg: '192.168.0.1'
+        Return the IPv4 DHCP server ID (as a string)
         
         Example:
         | Get Ipv4 Serverid |

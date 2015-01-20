@@ -1,1 +1,21 @@
-This library allows RobotFramework to interact with a DHCP server and to handle DHCP events using RobotFramework keywords
+DhcpClientLibrary for Robot Framework
+=====================================
+
+Introduction
+------------
+
+DhcpClientLibrary is a `Robot Framework <http://robotframework.org>`__ test
+library for testing a DHCP server.
+
+This library allows Robot Framework to interact with a DHCP server and to
+handle DHCP events using Robot Framework keywords
+
+DhcpClientLibrary is open source software licensed under `Apache License 2.0
+<http://www.apache.org/licenses/LICENSE-2.0.html>`__.
+
+Installation
+------------
+
+See this Legrand internal webpage
+<http://sirius.limousin.fr.grpleg.com/confluence/display/OUT/DhcpClientLibrary>`
+to install the library on a test engine.

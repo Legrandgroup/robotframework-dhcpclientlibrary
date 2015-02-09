@@ -69,8 +69,8 @@ Architecture of DhcpClientLibrary
 Having a working Python DHCP client requires root access rights in order to bind
 on a specific interface.
 
-RobotFramework usually does not execute with root access rigths, so the library is split between 
-two distinc processes:
+RobotFramework usually does not execute with root access rigths, so the library is split between
+two distinct processes:
 
 * `DBusControlledDhcpClient.py`: A Python DHCP client handler.
   Its primary class is DBusControlledDhcpClient

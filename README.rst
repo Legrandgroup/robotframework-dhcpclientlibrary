@@ -17,7 +17,7 @@ Installation
 ------------
 
 First, install the forked version pydhcplib available
-`here<https://github.com/Legrandgroup/pydhcplib>`__.
+`here <https://github.com/Legrandgroup/pydhcplib>`__.
 We cannot use the standard pydhcplib because we need to be able to specify
 the network interface on which we run the DHCP client.
 

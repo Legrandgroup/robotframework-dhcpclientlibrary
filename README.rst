@@ -16,6 +16,9 @@ DhcpClientLibrary is open source software licensed under `Apache License 2.0
 Installation
 ------------
 
-See this Legrand internal webpage
-<http://sirius.limousin.fr.grpleg.com/confluence/display/OUT/DhcpClientLibrary>`
-to install the library on a test engine.
+First, install the forked version pydhcplib available `here`
+<https://github.com/Legrandgroup/pydhcplib>`__.  We cannot use the standard pydhcplib
+because we need to be able to specify the network interface on which we run
+the DHCP client.
+
+Then run the provided ./setup.py script.

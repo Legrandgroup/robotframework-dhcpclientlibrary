@@ -94,4 +94,4 @@ network interface name on which the DHCP client runs (eg: *eth1*)
 This D-Bus object implements a service interface called
 com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary
 Its properties and the interprocessus communication looks like:
-[![robotframework-dhcpclientlibrary architecture](img/rfdhcpclientlib-arch.png)]
+![robotframework-dhcpclientlibrary architecture](/img/rfdhcpclientlib-arch.png?raw=true "robotframework-dhcpclientlibrary architecture")

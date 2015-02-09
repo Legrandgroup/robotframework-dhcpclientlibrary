@@ -25,7 +25,7 @@ setup(
     name='robotframework-modbuslibrary',
     version='0.0.1',
     description='Robot Framework library for Modbus',
-    long_description=read('README'),
+    long_description=read('README.rst'),
     author='Lionel Ains',
     author_email='lionel.ains@legrand.fr',
     url='https://github.com/Legrandgroup/robotframework-modbuslibrary',

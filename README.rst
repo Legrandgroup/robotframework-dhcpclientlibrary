@@ -16,9 +16,9 @@ DhcpClientLibrary is open source software licensed under `Apache License 2.0
 Installation
 ------------
 
-First, install the forked version pydhcplib available `here`
-<https://github.com/Legrandgroup/pydhcplib>`__.  We cannot use the standard pydhcplib
-because we need to be able to specify the network interface on which we run
-the DHCP client.
+First, install the forked version pydhcplib available
+`here<https://github.com/Legrandgroup/pydhcplib>`__.
+We cannot use the standard pydhcplib because we need to be able to specify
+the network interface on which we run the DHCP client.
 
-Then run the provided ./setup.py script.
+Once pydhcplib is installed, run the ./setup.py script.

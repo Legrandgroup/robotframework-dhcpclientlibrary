@@ -90,3 +90,8 @@ two distinct processes:
 These 2 processes are communicating via the D-Bus SYSTEM bus, under the object path
 /com/legrandelectric/RobotFrameworkIPC/*interface* , where *interface* corresponds to the
 network interface name on which the DHCP client runs (eg: *eth1*)
+
+This D-Bus object implements a service interface called
+com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary
+Its properties and the interprocessus communication looks like:
+[![robotframework-dhcpclientlibrary architecture](img/rfdhcpclientlib-arch.png)]

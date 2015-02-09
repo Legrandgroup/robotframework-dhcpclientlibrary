@@ -1,10 +1,10 @@
 DhcpClientLibrary for Robot Framework
 =====================================
 
-Introduction
-------------
 
-DhcpClientLibrary is a `Robot Framework <http://robotframework.org>`__ test
+## Introduction
+
+DhcpClientLibrary is a [Robot Framework](http://robotframework.org) test
 library for testing a DHCP server. It will send/receive DHCP packets to a server in
 order to stimulate this server (you can also send out of sequence requests from
 within this library if needed).
@@ -14,14 +14,15 @@ root so you will need to setup sudo accordingly (see below for more on this topi
 This library allows Robot Framework to interact with a DHCP server and to
 handle DHCP events using Robot Framework keywords
 
-DhcpClientLibrary is open source software licensed under `Apache License 2.0
-<http://www.apache.org/licenses/LICENSE-2.0.html>`__.
+DhcpClientLibrary is open source software licensed under
+[Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
-Installation
-------------
+## For users
+
+### Installation
 
 First, install the forked version pydhcplib available
-`here <https://github.com/Legrandgroup/pydhcplib>`__.
+[here](https://github.com/Legrandgroup/pydhcplib).
 Note: pydhcplib is available, for example, in Debian wheezy under the package
 python-pydhcplib, but we cannot use this standard pydhcplib because we need to be
 able to specify the network interface on which we run the DHCP client.
@@ -43,8 +44,7 @@ You can either:
     from pydhcplib.dhcp_network import *
 
 
-Fixing the D-Bus permissions
-----------------------------
+### Setting the D-Bus permissions
 
 In order to allow the D-Bus messages used by DhcpClientLibrary (on the system bus),
 you will need to setup the permissions accordingly.
@@ -62,8 +62,10 @@ Here is a sample permission file to save in /etc/d-bus-1/system.d:
     </busconfig>
 
 
-Architecture of DhcpClientLibrary
----------------------------------
+## For developpers
+
+### Architecture of DhcpClientLibrary
+
 
 Having a working Python DHCP client requires root access rights in order to bind
 on a specific interface.

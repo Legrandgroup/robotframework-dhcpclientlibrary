@@ -36,5 +36,6 @@ setup(
     platforms='any',
     classifiers=CLASSIFIERS.splitlines(),
     packages=['rfdhcpclientlib'],
+    scripts=['scripts/DBusControlledDhcpClient.py'],
     install_requires=['robotframework', 'pydhcplib']
 )

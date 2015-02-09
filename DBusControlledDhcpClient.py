@@ -26,8 +26,6 @@ import time
 import atexit
 import lockfile
 
-sys.path.insert(0, '/opt/python-local/lib/python2.7/site-packages/')
-
 from pydhcplib.dhcp_packet import *
 from pydhcplib.dhcp_network import *
 

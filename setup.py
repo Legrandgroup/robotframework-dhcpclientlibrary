@@ -7,6 +7,8 @@ from __future__ import with_statement
 from setuptools import setup
 from os.path import abspath, dirname, join
 
+from rfdhcpclientlib import __lib_version__
+
 def read(fname):
     """read and return fname file content"""
     curdir = dirname(abspath(__file__))
@@ -22,13 +24,13 @@ Topic :: Software Development :: Testing
 """[1:-1]
 
 setup(
-    name='robotframework-modbuslibrary',
-    version='0.0.1',
-    description='Robot Framework library for Modbus',
+    name='robotframework-dhcpclientlibrary',
+    version=__lib_version__,
+    description='This library allows RobotFramework to interact with a DHCP server and to handle DHCP events using RobotFramework keywords',
     long_description=read('README.rst'),
     author='Lionel Ains',
     author_email='lionel.ains@legrand.fr',
-    url='https://github.com/Legrandgroup/robotframework-modbuslibrary',
+    url='https://github.com/Legrandgroup/robotframework-dhcpclientlibrary',
     license='Apache License 2.0',
     keywords='robotframework testing testautomation dhcp bootp client',
     platforms='any',

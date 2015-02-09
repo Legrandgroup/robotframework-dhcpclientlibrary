@@ -1,0 +1,803 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="744.09448819"
+   height="1052.3622047"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.48.2 r9819"
+   sodipodi:docname="RF-ClientLibrary-Archi(1).svg">
+  <defs
+     id="defs4">
+    <marker
+       inkscape:stockid="EmptyTriangleOutL"
+       orient="auto"
+       refY="0.0"
+       refX="0.0"
+       id="EmptyTriangleOutL"
+       style="overflow:visible">
+      <path
+         id="path4366"
+         d="M 5.77,0.0 L -2.88,5.0 L -2.88,-5.0 L 5.77,0.0 z "
+         style="fill-rule:evenodd;fill:#FFFFFF;stroke:#000000;stroke-width:1.0pt;marker-start:none"
+         transform="scale(0.8) translate(-6,0)" />
+    </marker>
+    <marker
+       inkscape:stockid="Arrow1Lend"
+       orient="auto"
+       refY="0.0"
+       refX="0.0"
+       id="Arrow1Lend"
+       style="overflow:visible;">
+      <path
+         id="path4208"
+         d="M 0.0,0.0 L 5.0,-5.0 L -12.5,0.0 L 5.0,5.0 L 0.0,0.0 z "
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1.0pt;marker-start:none;"
+         transform="scale(0.8) rotate(180) translate(12.5,0)" />
+    </marker>
+    <marker
+       inkscape:stockid="DiamondLend"
+       orient="auto"
+       refY="0.0"
+       refX="0.0"
+       id="DiamondLend"
+       style="overflow:visible">
+      <path
+         id="path4303"
+         d="M 0,-7.0710768 L -7.0710894,0 L 0,7.0710589 L 7.0710462,0 L 0,-7.0710768 z "
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1.0pt;marker-start:none"
+         transform="scale(0.8) translate(-7,0)" />
+    </marker>
+    <marker
+       inkscape:stockid="DiamondLstart"
+       orient="auto"
+       refY="0.0"
+       refX="0.0"
+       id="DiamondLstart"
+       style="overflow:visible">
+      <path
+         id="path4294"
+         d="M 0,-7.0710768 L -7.0710894,0 L 0,7.0710589 L 7.0710462,0 L 0,-7.0710768 z "
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1.0pt;marker-start:none"
+         transform="scale(0.8) translate(7,0)" />
+    </marker>
+    <marker
+       inkscape:stockid="DiamondLend"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="DiamondLend-4"
+       style="overflow:visible">
+      <path
+         inkscape:connector-curvature="0"
+         id="path4303-3"
+         d="M 0,-7.0710768 -7.0710894,0 0,7.0710589 7.0710462,0 0,-7.0710768 z"
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt;marker-start:none"
+         transform="matrix(0.8,0,0,0.8,-5.6,0)" />
+    </marker>
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1.4"
+     inkscape:cx="399.32707"
+     inkscape:cy="753.51814"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     showgrid="true"
+     inkscape:window-width="1920"
+     inkscape:window-height="1058"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1">
+    <inkscape:grid
+       type="xygrid"
+       id="grid2985"
+       empspacing="5"
+       visible="true"
+       enabled="true"
+       snapvisiblegridlinesonly="true" />
+  </sodipodi:namedview>
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="fill:#f2f4a3;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
+       id="rect2987"
+       width="620"
+       height="420"
+       x="-650"
+       y="22.362183"
+       transform="scale(-1,1)"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
+       x="332.2207"
+       y="32.362183"
+       id="text2993"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan2995"
+         x="332.2207"
+         y="32.362183">Machine de test</tspan></text>
+    <rect
+       style="fill:#a3f4b9;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
+       id="rect2997"
+       width="280"
+       height="350"
+       x="40"
+       y="42.362183"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="135.50098"
+       y="52.362183"
+       id="text2989-1-4"
+       sodipodi:linespacing="125%"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"><tspan
+         sodipodi:role="line"
+         id="tspan3809"
+         x="135.50098"
+         y="52.362183">Robotframework</tspan></text>
+    <rect
+       style="fill:#babbde;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
+       id="rect3813"
+       width="200"
+       height="155"
+       x="90"
+       y="72.362183"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans Bold"
+       x="137.63477"
+       y="82.362183"
+       id="text2989-1"
+       sodipodi:linespacing="125%"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"><tspan
+         sodipodi:role="line"
+         id="tspan3811"
+         x="137.63477"
+         y="82.362183">DhcpClientLibrary</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 90,92.362183 200,0"
+       id="path3815"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:83%;letter-spacing:0px;word-spacing:0px;writing-mode:lr;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="90"
+       y="102.36218"
+       id="text2989-1-9"
+       sodipodi:linespacing="83%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan3866"
+         x="90"
+         y="102.36218">- _ifname</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3868"
+         x="90"
+         y="117.36218">- _dhcp_client_daemon_exec_path</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3870"
+         x="90"
+         y="132.36218">- _slave_dhcp_process</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3872"
+         x="90"
+         y="147.36218">- _dhcp_client_ctrl</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 90,152.36218 200,0"
+       id="path3815-8"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:83%;letter-spacing:0px;word-spacing:0px;writing-mode:lr;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="90"
+       y="162.36218"
+       id="text2989-1-9-8"
+       sodipodi:linespacing="83%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan3152">start()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3154">stop()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3156">restart()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3158">wait_lease()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3160">get_ipv4_address()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3162">get_ipv4_dns_list()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3164">...</tspan></text>
+    <rect
+       style="fill:#babbde;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
+       id="rect3813-1"
+       width="200"
+       height="70"
+       x="90"
+       y="237.36218"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans Bold"
+       x="136.00586"
+       y="247.36218"
+       id="text2989-1-7"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan3951"
+         x="136.00586"
+         y="247.36218">SlaveDhcpProcess</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 90,257.36218 200,0"
+       id="path3815-1"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:82.99999833%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="90"
+       y="267.36218"
+       id="text2989-1-9-8-5"
+       sodipodi:linespacing="82.999998%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan4012"
+         x="90"
+         y="267.36218">start()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan4014"
+         x="90"
+         y="277.32217">kill()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan4016"
+         x="90"
+         y="287.2822">isRunning()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan4018"
+         x="90"
+         y="297.24219">hasBeenStarted()</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-start:none;marker-end:url(#DiamondLend)"
+       d="m 220,122.36218 80,0 -0.0568,125 -9.94316,0"
+       id="path4020"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <rect
+       style="fill:#a3f4b9;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
+       id="rect2997-4"
+       width="280"
+       height="350"
+       x="360"
+       y="42.362183"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="390.46484"
+       y="52.362183"
+       id="text2989-1-4-2"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan5243"
+         x="390.46484"
+         y="52.362183">Processus DBusControlledDhcpClient.py</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:10px;font-style:oblique;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:end;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:end;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans Oblique"
+       x="320"
+       y="52.362183"
+       id="text5245"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan5247"
+         x="320"
+         y="52.362183">(jenkins)</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:10px;font-style:oblique;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:end;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:end;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans Oblique"
+       x="640"
+       y="52.362183"
+       id="text5245-2"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan5270"
+         x="640"
+         y="52.362183">(root)</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Lend)"
+       d="m 130,267.36218 210,0 0,-204.999995 20,0"
+       id="path5014"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <g
+       transform="matrix(0,-0.73761832,0.73761832,0,-688.54873,230.80977)"
+       id="layer1-7"
+       inkscape:label="Layer 1"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120">
+      <g
+         id="text2987"
+         style="font-size:78.59629822px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
+         transform="matrix(0,-0.633725,-1.57797,0,0,0)">
+        <path
+           id="path2985"
+           style="font-variant:normal;font-stretch:normal;text-align:start;line-height:125%;text-anchor:start;font-family:NSimSun"
+           d="m -1637.9508,-33.933505 c -2.6608,0.204705 -4.4518,1.074585 -5.3728,2.609643 -0.9211,1.535107 -1.3816,3.530714 -1.3816,5.986828 l 0,13.201722 c 0,4.5029135 -0.8187,7.6242477 -2.4561,9.3640117 -1.6374,1.7397562 -4.1959,2.60963622 -7.6754,2.60964267 l 0,-2.14911757 c 2.8655,-4.3e-6 4.8099,-0.7675455 5.8333,-2.3026259 1.0234,-1.5350844 1.5351,-3.6330304 1.5351,-6.2938439 l 0,-15.043823 c 0,-2.865468 0.6652,-5.014583 1.9956,-6.447353 1.3304,-1.432717 2.9166,-2.149089 4.7587,-2.149117 l 0,-0.614034 c -1.6374,2.9e-5 -3.1725,-0.614004 -4.6052,-1.8421 -1.4328,-1.228036 -2.1491,-3.47949 -2.1491,-6.75437 l 0,-15.043823 c 0,-2.865434 -0.5117,-5.01455 -1.5351,-6.447352 -1.0234,-1.432685 -2.9678,-2.149057 -5.8333,-2.149118 l 0,-2.149117 c 3.4795,6.3e-5 6.038,0.869943 7.6754,2.609643 1.6374,1.73982 2.4561,4.861154 2.4561,9.364012 l 0,13.201722 c 0,2.865525 0.5117,4.912301 1.5351,6.140335 1.0234,1.228098 2.7631,2.046809 5.2193,2.456135 z"
+           inkscape:connector-curvature="0" />
+      </g>
+    </g>
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="-190.49019"
+       y="70.600861"
+       id="text2989-1-4-6"
+       sodipodi:linespacing="125%"
+       transform="matrix(0,-1,1,0,0,0)"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"><tspan
+         sodipodi:role="line"
+         id="tspan5314"
+         x="-190.49019"
+         y="70.600861">RF API (keywords)</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="-155.60242"
+       y="340"
+       id="text2989-1-4-6-8"
+       sodipodi:linespacing="125%"
+       transform="matrix(0,-1,1,0,0,0)"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"><tspan
+         sodipodi:role="line"
+         id="tspan5337"
+         x="-155.60242"
+         y="340">Process spawned (using sudo)</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       d="m 40,412.36218 600,0"
+       id="path5339"
+       inkscape:connector-curvature="0"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       d="m 180,412.36218 0,-30"
+       id="path5341"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       d="m 500,412.36218 0,-40"
+       id="path5343"
+       inkscape:connector-curvature="0"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <rect
+       style="fill:#babbde;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
+       id="rect3813-1-2"
+       width="200"
+       height="70"
+       x="90"
+       y="317.36218"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans Bold"
+       x="114.92383"
+       y="327.36218"
+       id="text2989-1-7-7"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan5372"
+         x="114.92383"
+         y="327.36218">RemoteDhcpClientControl</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 90,337.36218 200,0"
+       id="path3815-1-5"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-start:none;marker-end:url(#DiamondLend)"
+       d="m 200,132.36218 110,0 0,195 -20,0"
+       id="path4020-1"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:82.99999833%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="90"
+       y="347.36218"
+       id="text2989-1-9-8-5-2"
+       sodipodi:linespacing="82.999998%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan5428"
+         x="90"
+         y="347.36218">getIpv4Address()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan5430"
+         x="90"
+         y="357.32217">getIpv4Netmask()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan5432"
+         x="90"
+         y="367.2822">getIpv4DefaultGateway()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan5434"
+         x="90"
+         y="377.24219">getIpv4DnsList()</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:14px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="339.7915"
+       y="432.36218"
+       id="text5436"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan5440"
+         x="339.7915"
+         y="432.36218">D-Bus System Bus: &quot;com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary&quot;</tspan></text>
+    <rect
+       style="fill:#babbde;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
+       id="rect3813-13"
+       width="200"
+       height="240"
+       x="400"
+       y="142.36218"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans Bold"
+       x="422.2666"
+       y="152.36218"
+       id="text2989-1-8"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan3096"
+         x="422.2666"
+         y="152.36218">DBusControlledDhcpClient</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 400,162.36218 200,0"
+       id="path3815-4"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:82.99999833%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="400"
+       y="172.36218"
+       id="text2989-1-9-2"
+       sodipodi:linespacing="82.999998%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan5555"
+         x="400"
+         y="172.36218">- _ifname</tspan><tspan
+         sodipodi:role="line"
+         id="tspan5557"
+         x="400"
+         y="182.32219">- _listen_address</tspan><tspan
+         sodipodi:role="line"
+         id="tspan5559"
+         x="400"
+         y="192.28218">- _client_port</tspan><tspan
+         sodipodi:role="line"
+         id="tspan5561"
+         x="400"
+         y="202.24219">- _server_port</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 400,212.36218 200,0"
+       id="path3815-8-1"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:83%;letter-spacing:0px;word-spacing:0px;writing-mode:lr;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="400"
+       y="222.36218"
+       id="text2989-1-9-8-9"
+       sodipodi:linespacing="83%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan3100">Discover()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3102">Renew()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3104">Restart()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3106">FreezeRenew()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3108">GetPid()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3111">GetVersion()</tspan></text>
+    <path
+       id="path2985-2"
+       style="font-size:78.59629822px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:NSimSun"
+       d="m 386.53753,241.85889 c 1.00026,0.18295 1.67355,0.96038 2.01977,2.33229 0.34627,1.37197 0.51938,3.15549 0.51938,5.35057 l 0,11.79868 c 0,4.02437 0.30777,6.81397 0.92332,8.36884 0.61554,1.55486 1.57734,2.3323 2.88538,2.3323 l 0,-1.92072 c -1.07722,0 -1.80817,-0.68598 -2.19289,-2.05791 -0.38472,-1.37194 -0.57709,-3.24692 -0.57709,-5.62495 l 0,-13.44502 c 0,-2.56093 -0.25006,-4.48164 -0.75019,-5.76214 -0.50014,-1.28045 -1.09643,-1.92069 -1.78892,-1.92072 l 0,-0.54878 c 0.61554,3e-5 1.19262,-0.54874 1.73121,-1.64632 0.53863,-1.09752 0.8079,-3.10969 0.8079,-6.03654 l 0,-13.44501 c 0,-2.56091 0.19237,-4.48161 0.57709,-5.76214 0.38472,-1.28043 1.11567,-1.92066 2.19289,-1.92072 l 0,-1.92072 c -1.30804,6e-5 -2.26984,0.7775 -2.88538,2.3323 -0.61555,1.55492 -0.92332,4.34452 -0.92332,8.36884 l 0,11.79868 c 0,2.56098 -0.19236,4.39023 -0.57708,5.48776 -0.38472,1.09758 -1.03872,1.82928 -1.96207,2.19511 z"
+       inkscape:connector-curvature="0"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="-231.26718"
+       y="382.88538"
+       id="text2989-1-4-6-86"
+       sodipodi:linespacing="125%"
+       transform="matrix(0,-1,1,0,0,0)"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"><tspan
+         sodipodi:role="line"
+         id="tspan5553"
+         x="-231.26718"
+         y="382.88538">DBUS Methods</tspan></text>
+    <rect
+       style="fill:#babbde;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
+       id="rect3813-13-2"
+       width="120.49902"
+       height="60"
+       x="369.50098"
+       y="62.362183"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans Bold"
+       x="397.45898"
+       y="72.362183"
+       id="text2989-1-8-4"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan5598"
+         x="397.45898"
+         y="72.362183">DhcpClient</tspan></text>
+    <rect
+       style="fill:#babbde;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
+       id="rect3813-13-6"
+       width="120"
+       height="60"
+       x="510"
+       y="62.362183"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans Bold"
+       x="514.50391"
+       y="72.362183"
+       id="text2989-1-8-5"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan5600"
+         x="514.50391"
+         y="72.362183">dbus.service.Object</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 370,82.362183 120,0"
+       id="path3815-4-9"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 510,82.362183 120,0"
+       id="path3815-4-0"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#EmptyTriangleOutL)"
+       d="m 490,142.36218 0,-10 -60,0 0,-10"
+       id="path5627"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#EmptyTriangleOutL)"
+       d="m 510,142.36218 0,-9.99999 60,-1e-5 0,-10"
+       id="path5629"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:83%;letter-spacing:0px;word-spacing:0px;writing-mode:lr;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="400"
+       y="292.36218"
+       id="text2989-1-9-8-9-0"
+       sodipodi:linespacing="83%"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"><tspan
+         sodipodi:role="line"
+         id="tspan3110">DhcpDiscoverSent()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3112">DhcpOfferRecv()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3114">DhcpRequestSent()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3116">DhcpRenewSent()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3118">DhcpReleaseSent()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3120">DhcpAckRecv()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3122">IpConfigApplied()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3124">IpDnsReceived()</tspan><tspan
+         sodipodi:role="line"
+         id="tspan3126">LeaseLost()</tspan></text>
+    <path
+       id="path2985-2-4"
+       style="font-size:78.59629822px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:NSimSun"
+       d="m 386.42213,324.95303 c 1.00026,0.26416 1.67355,1.38671 2.01977,3.36763 0.34627,1.98102 0.51938,4.55628 0.51938,7.72579 l 0,17.03633 c 0,5.81087 0.30777,9.83882 0.92332,12.08393 0.61554,2.24509 1.57734,3.36765 2.88538,3.36765 l 0,-2.77336 c -1.07722,0 -1.80817,-0.9905 -2.19289,-2.97146 C 390.19237,360.80857 390,358.10125 390,354.66757 l 0,-19.41351 c 0,-3.69778 -0.25006,-6.47112 -0.75019,-8.32006 -0.50014,-1.84887 -1.09643,-2.77332 -1.78892,-2.77337 l 0,-0.79239 c 0.61554,4e-5 1.19262,-0.79233 1.73121,-2.37715 0.53863,-1.58473 0.8079,-4.49014 0.8079,-8.71627 l 0,-19.4135 c 0,-3.69775 0.19237,-6.47108 0.57709,-8.32006 0.38472,-1.84884 1.11567,-2.77328 2.19289,-2.77337 l 0,-2.77336 c -1.30804,9e-5 -2.26984,1.12265 -2.88538,3.36765 -0.61555,2.24518 -0.92332,6.27314 -0.92332,12.08393 l 0,17.03633 c 0,3.69784 -0.19236,6.33913 -0.57708,7.92388 -0.38472,1.58481 -1.03872,2.64133 -1.96207,3.16956 z"
+       inkscape:connector-curvature="0"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
+       x="-323.99591"
+       y="382.76999"
+       id="text2989-1-4-6-86-4"
+       sodipodi:linespacing="125%"
+       transform="matrix(0,-1,1,0,0,0)"
+       inkscape:export-xdpi="120"
+       inkscape:export-ydpi="120"
+       inkscape:export-filename="C:\Users\ains\Downloads\RF-ClientLibrary-Archi.png"><tspan
+         sodipodi:role="line"
+         id="tspan6089"
+         x="-323.99591"
+         y="382.76999">DBUS Signals</tspan></text>
+  </g>
+</svg>

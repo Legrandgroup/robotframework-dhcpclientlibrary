@@ -38,11 +38,11 @@ You can either:
 - use the environment variable PYTHONPATH
 - or modify rfdhcpclientlib/DhcpClientLibrary.py as follows:
 ```python
-    import sys
-    sys.path.insert(0, '/opt/python-local/lib/python2.7/site-packages/') # Insert this line, adapting the path to your local setup
-    from pydhcplib.dhcp_packet import *
-    from pydhcplib.dhcp_network import *
-``
+import sys
+sys.path.insert(0, '/opt/python-local/lib/python2.7/site-packages/') # Insert this line, adapting the path to your local setup
+from pydhcplib.dhcp_packet import *
+from pydhcplib.dhcp_network import *
+```
 
 ### Setting the D-Bus permissions
 
@@ -74,7 +74,8 @@ on a specific interface.
 RobotFramework usually does not execute with root access rigths, so the library is split between
 two distinct processes:
 
-* DBusControlledDhcpClient.py: A Python DHCP client handler.
+* [DBusControlledDhcpClient.py](/scripts/DBusControlledDhcpClient.py): A Python DHCP client
+  handler.
   Its primary class is DBusControlledDhcpClient
   This code is running in a process that is distinct from RobotFramework, with root access rights.
   It sends/receives DHCP packets directly on a network interface (via the pydhcplib library).
@@ -82,11 +83,11 @@ two distinct processes:
   It reports DHCP states by sending D-Bus signals.
   This module is imported by RobotFramework but can also be run stand-alone (in that cas, it
   behaves as a DHCP client)
-* DhcpClientLibrary.py: This is the RobotFramework library.
+* [DhcpClientLibrary.py](DhcpClientLibrary.py): This is the RobotFramework library.
   Its primary class is DhcpClientLibrary
   This Python code runs within the RobotFramework process, with the same access rights as
   RobottFramework.
-  It will run a child subrocess that will execute DBusControlledDhcpClient.py as root (via sudo).
+  It will run a child subrocess that will execute `DBusControlledDhcpClient.py` as root (via sudo).
   It will then interact with this subprocess using D-Bus calls & signals.
   It offers a RobotFramework interface to allow the use of higher level RobotFramework keywords.
 
@@ -95,6 +96,6 @@ These 2 processes are communicating via the D-Bus SYSTEM bus, under the object p
 network interface name on which the DHCP client runs (eg: *eth1*)
 
 This D-Bus object implements a service interface called
-com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary
+`com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary`
 Its properties and the interprocessus communication looks like:
 ![robotframework-dhcpclientlibrary architecture](/img/rfdhcpclientlib-arch.png?raw=true "robotframework-dhcpclientlibrary architecture")

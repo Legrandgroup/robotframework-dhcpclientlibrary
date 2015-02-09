@@ -34,5 +34,5 @@ setup(
     platforms='any',
     classifiers=CLASSIFIERS.splitlines(),
     packages=['rfdhcpclientlib'],
-    install_requires=['robotframework', 'pydhcp']
+    install_requires=['robotframework', 'pydhcplib']
 )

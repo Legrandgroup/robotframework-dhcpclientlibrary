@@ -30,19 +30,19 @@ able to specify the network interface on which we run the DHCP client.
 You can also install the locally modified version of pydhcplib in a local
 directory (in order note to interfere with an official version of pydhcplib).
 In order to do this, just add the --prefix= option when running pydhcplib's
-"./setup.py install" command.
+`./setup.py install` command.
 
 If you decice to go that way, you will have to fix the search PATH yourself though,
 so that the RobotFramework DhcpClientLibrary uses the correct pydhcplib version.
 You can either:
 - use the environment variable PYTHONPATH
 - or modify rfdhcpclientlib/DhcpClientLibrary.py as follows:
-
+```python
     import sys
     sys.path.insert(0, '/opt/python-local/lib/python2.7/site-packages/') # Insert this line, adapting the path to your local setup
     from pydhcplib.dhcp_packet import *
     from pydhcplib.dhcp_network import *
-
+``
 
 ### Setting the D-Bus permissions
 
@@ -51,16 +51,17 @@ you will need to setup the permissions accordingly.
 
 Here is a sample permission file to save in /etc/d-bus-1/system.d:
 
-    <!DOCTYPE busconfig PUBLIC
-     "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
-     "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
-    <busconfig>
-      <policy context="default">
-        <allow own="com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary"/>
-        <allow send_destination="com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary"/>
-      </policy>
-    </busconfig>
-
+```XML
+<!DOCTYPE busconfig PUBLIC
+ "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <policy context="default">
+    <allow own="com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary"/>
+    <allow send_destination="com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary"/>
+  </policy>
+</busconfig>
+```
 
 ## For developpers
 

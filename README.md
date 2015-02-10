@@ -74,12 +74,14 @@ RIDE's online help) to get a detailed description of keywords).
 #### `Start`
 
 **Start the DHCP client**
+
 Note: a network interface must be either:
 * have been provided using **`Set Interface`** prior to calling **`Start`**
 * be provided as an argument to **`Start`**
 
 #### `Stop`
 **Stop the DHCP client subprocess**
+
 Warning: It is really mandatory to call **`Stop`** each time **`Start`** is
 called, or zombie subprocesses may be hanging around forever. Thus, the best
 is to take the habit to use **`Stop`** in the teardown (in case a test fails)
@@ -89,6 +91,7 @@ is to take the habit to use **`Stop`** in the teardown (in case a test fails)
 
 #### `Set Interface`
 **Set the network interface on which the DHCP client runs**
+
 eg: `eth1`
 
 #### `Get Interface`
@@ -96,6 +99,7 @@ eg: `eth1`
 
 #### `Wait Ipv4 Lease`
 **Wait for a DHCP lease**
+
 A timeout can be setup if needed.
 The IP address allocated by the DHCP server is returned
 
@@ -104,6 +108,7 @@ The IP address allocated by the DHCP server is returned
 
 #### `Get Ipv4 Netmask`
 **Get the current IPv4 netmask**
+
 Format is dotted-decimal
 
 #### `Get Ipv4 Defaultgw`
@@ -111,6 +116,7 @@ Format is dotted-decimal
 
 #### `Get Ipv4 Serverid`
 **Get the IPv4 address of the DHCP server**
+
 This IPv4 address corresponds to the DHCP server that allocated a lease to us
 
 #### `Get Ipv4 Dns List`
@@ -118,6 +124,7 @@ This IPv4 address corresponds to the DHCP server that allocated a lease to us
 
 #### `Is Ipv4 Lease Valid`
 **Does the DHCP client currently has a lease**
+
 Returns `${True}` for a valid (non-expired) lease
 
 ## For developpers

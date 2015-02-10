@@ -14,6 +14,8 @@ root so you will need to setup sudo accordingly (see below for more on this topi
 This library allows Robot Framework to interact with a DHCP server and to
 handle DHCP events using Robot Framework keywords
 
+Currently, it only supports IPv4 DHCP (not IPv6)
+
 DhcpClientLibrary is open source software licensed under
 [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
@@ -99,3 +101,56 @@ This D-Bus object implements a service interface called
 `com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary`
 Its properties and the interprocessus communication looks like:
 ![robotframework-dhcpclientlibrary architecture](/img/rfdhcpclientlib-arch.png?raw=true "robotframework-dhcpclientlibrary architecture")
+
+### D-Bus messaging used between `DBusControlledDhcpClient` and `DhcpClientLibrary`
+
+The following D-Bus signals are sent by `DBusControlledDhcpClient.py`:
+
+* `DhcpDiscoverSent` when a DHCP Discover packet is sent to the network
+* `DhcpOfferRecv` when a DHCP Offer packet is received from the network
+* `DhcpRequestSent` when a DHCP Request packet is sent to the network in order to request an
+  IP address lease
+* `DhcpRenewSent`  when a DHCP Request packet is sent to the network in order to renew a
+  an existing lease
+* `DhcpReleaseSent` when a IP address lease is released (and it is also sent when the processus
+  running DBusControlledDhcpClient.py is terminated)
+* `DhcpAckRecv` when a DHCP Ack packet is received from the network
+* `IpConfigApplied` when an IP configuration is acknowledged by the DHCP server. This signal also
+  contains details about the lease (as string arguments: IP address, netmask, default gateway and
+  the DNS servers (space-separated list in a string)
+* `IpDnsReceived` when a DNS server list is acknowledged by the DHCP server. This signal also
+  contains on string argument: a space-separated list of the DNS servers
+* `LeaseLost` when the current IP address lease is lost
+
+The following D-Bus methods can be invoked on `DBusControlledDhcpClient.py`:
+
+* `Discover()`: (re)start the IP address discovery. This is done automatically when
+  `DBusControlledDhcpClient.py` is run in standalone mode, but must be done manually when one
+  creates an instance of a `DBusControlledDhcpClient` object. On usually invokes the
+  `sendDhcpDiscover()` method, which is equivalent but not available via D-Bus
+* `GetVersion()`: Get the version of the currently running `DBusControlledDhcpClient.py`
+* `GetInterface()`: Get the network interface on which `DBusControlledDhcpClient.py` runs
+* `GetPid()`: Returns an integer containing the PID of the process running
+  `DBusControlledDhcpClient.py`
+* `Renew()`: force renewing the DHCP lease immediately
+* `Restart()`: restart the DHCP client (Release + restart from Discover stage)
+* `FreezeRenew()`: prevent any renew of the DHCP lease (but do not send a DHCP Release either)
+* `Debug()`: Write to stdout the character string provided as parameter
+
+### D-Bus diagnosis using D-Feet
+
+It is possible du trace D-Bus messages sent on interface
+`com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary`
+
+* In order to follow the state machine during executing of RobotFramework (by tracing D-Bus
+  messages between DBusControlledDhcpClient and DhcpClientLibrary)
+* When manually running `DBusControlledDhcpClient`, in order to control it via D-Bus (there
+  will also be some debug information on the console)
+
+To trace D-Bus messages, you can use D-Feet for Gnome, selecting the system bus, and interface
+`com.legrandelectric.RobotFrameworkIPC.DhcpClientLibrary`
+
+![Debugging using D-Feet](/img/debug-using-D-Feet.png?raw=true "Debugging using D-Feet")
+
+You can then invoke D-Bus methods on the `DBusControlledDhcpClient.py` process.
+

@@ -71,53 +71,54 @@ The following RobotFramework keywords are made available by this library:
 Note: it is advised to go directly inside the python code's docstrings (or via
 RIDE's online help) to get a detailed description of keywords).
 
-* `**Start**`
-  **Start the DHCP client**
-  Note: a network interface must be either:
-  * have been provided using `**Set Interface**` prior to calling `**Start**`
-  * be provided as an argument to `**Start**`
+#### `Start`
 
-* `**Stop**`
-  **Stop the DHCP client subprocess**
-  Warning: It is really mandatory to call `**Stop**` each time `**Start**` is
-  called, or zombie subprocesses may be hanging around forever. Thus, the best
-  is to take the habit to use `**Stop**` in the teardown (in case a test fails)
+**Start the DHCP client**
+Note: a network interface must be either:
+* have been provided using **`Set Interface`** prior to calling **`Start`**
+* be provided as an argument to **`Start`**
 
-* `**Restart**`
-  **Equivalent to `Start`+`Stop`**
+#### `Stop`
+**Stop the DHCP client subprocess**
+Warning: It is really mandatory to call **`Stop`** each time **`Start`** is
+called, or zombie subprocesses may be hanging around forever. Thus, the best
+is to take the habit to use **`Stop`** in the teardown (in case a test fails)
 
-* `**Set Interface**`
-  **Set the network interface on which the DHCP client runs**
-  eg: `eth1`
+#### `Restart`
+**Equivalent to **`Start`**+**`Stop`**
 
-* `**Get Interface**`
-  **Get the network interface on which the DHCP client runs**
+#### `Set Interface`
+**Set the network interface on which the DHCP client runs**
+eg: `eth1`
 
-* `**Wait Ipv4 Lease**`
-  **Wait for a DHCP lease**
-  A timeout can be setup if needed.
-  The IP address allocated by the DHCP server is returned
+#### `Get Interface`
+**Get the network interface on which the DHCP client runs**
 
-* `**Get Ipv4 Address**`
-  **Get the IPv4 address currently allocated to the DHCP client**
+#### `Wait Ipv4 Lease`
+**Wait for a DHCP lease**
+A timeout can be setup if needed.
+The IP address allocated by the DHCP server is returned
 
-* `**Get Ipv4 Netmask**`
-  **Get the current IPv4 netmask**
-  Format is dotted-decimal
+#### `Get Ipv4 Address`
+**Get the IPv4 address currently allocated to the DHCP client**
 
-* `**Get Ipv4 Defaultgw**`
-  **Get the current IPv4 default gateway**
+#### `Get Ipv4 Netmask`
+**Get the current IPv4 netmask**
+Format is dotted-decimal
 
-* `**Get Ipv4 Serverid**`
-  **Get the IPv4 address of the DHCP server**
-  This IPv4 address corresponds to the DHCP server that allocated a lease to us
+#### `Get Ipv4 Defaultgw`
+**Get the current IPv4 default gateway**
 
-* `**Get Ipv4 Dns List**`
-  **Get the list of IPv4 DNS provided by the DHCP server**
+#### `Get Ipv4 Serverid`
+**Get the IPv4 address of the DHCP server**
+This IPv4 address corresponds to the DHCP server that allocated a lease to us
 
-* `**Is Ipv4 Lease Valid**`
-  **Does the DHCP client currently has a lease**
-  Returns ${True} for a valid (non-expired) lease
+#### `Get Ipv4 Dns List`
+**Get the list of IPv4 DNS provided by the DHCP server**
+
+#### `Is Ipv4 Lease Valid`
+**Does the DHCP client currently has a lease**
+Returns `${True}` for a valid (non-expired) lease
 
 ## For developpers
 

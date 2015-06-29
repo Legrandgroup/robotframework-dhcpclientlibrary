@@ -27,7 +27,7 @@ setup(
     name='robotframework-dhcpclientlibrary',
     version=__lib_version__,
     description='This library allows RobotFramework to interact with a DHCP server and to handle DHCP events using RobotFramework keywords',
-    long_description=read('README.rst'),
+    long_description=read('README.md'),
     author='Lionel Ains',
     author_email='lionel.ains@legrand.fr',
     url='https://github.com/Legrandgroup/robotframework-dhcpclientlibrary',

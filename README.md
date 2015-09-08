@@ -46,6 +46,9 @@ from pydhcplib.dhcp_packet import *
 from pydhcplib.dhcp_network import *
 ```
 
+Once this library is installed, you can use it with the following python import:
+import rfdhcpclientlib.DhcpClientLibrary
+
 ### Setting the D-Bus permissions
 
 In order to allow the D-Bus messages used by DhcpClientLibrary (on the system bus),
@@ -130,7 +133,6 @@ Returns `${True}` for a valid (non-expired) lease
 ## For developpers
 
 ### Architecture of DhcpClientLibrary
-
 
 Having a working Python DHCP client requires root access rights in order to bind
 on a specific interface.

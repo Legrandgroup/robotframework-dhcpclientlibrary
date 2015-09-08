@@ -29,7 +29,7 @@ import lockfile
 from pydhcplib.dhcp_packet import *
 from pydhcplib.dhcp_network import *
 
-import DhcpLeaseStatus
+import rfdhcpclientlib.DhcpLeaseStatus
 
 #import pyiface	# Commented-out... for now we are using the system's userspace tools (ifconfig, route etc...)
 
@@ -142,7 +142,7 @@ class DBusControlledDhcpClient(DhcpClient, dbus.service.Object):
         self._server_port = server_port
         self._silent_mode = silent_mode
         
-        self._dhcp_status = DhcpLeaseStatus.DhcpLeaseStatus()
+        self._dhcp_status = rfdhcpclientlib.DhcpLeaseStatus.DhcpLeaseStatus()
         
         self._request_sent = False
         

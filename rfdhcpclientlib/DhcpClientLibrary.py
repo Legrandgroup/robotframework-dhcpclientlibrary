@@ -21,6 +21,21 @@ import DhcpLeaseStatus
 
 import tempfile # Temporary to debug TimeoutOnGetVersion
 
+if __name__ != '__main__':
+    from robot.api import logger
+else:
+    try:
+        from console_logger import LOGGER as logger
+    except ImportError:
+        import logging
+
+        logger = logging.getLogger('console_logger')
+        logger.setLevel(logging.DEBUG)
+        
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        logger.addHandler(handler)
+
 client = None
 
 # This cleanup handler is not used when this library is imported in RF, only when run as standalone
@@ -153,7 +168,7 @@ class RemoteDhcpClientControl:
         This method is used as a callback for asynchronous D-Bus method call to GetVersion()
         It is run as an error_handler to raise an exception when the call to GetVersion() failed
         """
-        logger.error('Error on invocation of GetVersion() to slave, via D-Bus')
+        logger.warn('Error on invocation of GetVersion() to slave, via D-Bus')
         raise Exception('ErrorOnDBusGetVersion')
         
     def notifyNewLease(self, callback):
@@ -311,12 +326,12 @@ class SlaveDhcpClientProcess:
     if log is set to False, no logging will be performed on the logger object 
     """
     
-    def __init__(self, dhcp_client_daemon_exec_path, ifname, log = True):
+    def __init__(self, dhcp_client_daemon_exec_path, ifname, logger = None):
         self._slave_dhcp_client_path = dhcp_client_daemon_exec_path
         self._slave_dhcp_client_proc = None
         self._slave_dhcp_client_pid = None
         self._ifname = ifname
-        self._log = log
+        self._logger = logger
         self._all_processes_pid = []  # List of all subprocessed launched by us
     
     def start(self):
@@ -326,7 +341,8 @@ class SlaveDhcpClientProcess:
         if self.isRunning():
             raise Exception('DhcpClientAlreadyStarted')
         cmd = ['sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A', '-S']
-        logger.debug('Running command ' + str(cmd))
+        if self._logger is not None:
+            self._logger.debug('Running command ' + str(cmd))
         #self._slave_dhcp_client_proc = robot.libraries.Process.Process()
         #self._slave_dhcp_client_proc.start_process('sudo', self._slave_dhcp_client_path, '-i', self._ifname, '-A', '-S')
         self._slave_dhcp_client_proc = subprocess.Popen(cmd)#, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
@@ -337,7 +353,8 @@ class SlaveDhcpClientProcess:
         """
         Add a (child) PID to the list of PIDs that we should terminate when kill() is run
         """
-        logger.debug('Adding slave PID ' + str(pid))
+        if self._logger is not None:
+            self._logger.debug('Adding slave PID ' + str(pid))
         if not pid in self._all_processes_pid:  # Make sure we don't add twice a PID
             self._all_processes_pid += [pid] # Add
 
@@ -359,7 +376,8 @@ class SlaveDhcpClientProcess:
         If argument force is set to True, wait a maximum of timeout seconds after SIGINT and send a SIGKILL if is still alive after this timeout
         """
 
-        if log: logger.info('Sending SIGINT to slave PID ' + str(pid))
+        if self._logger is not None:
+            self._logger.info('Sending SIGINT to slave PID ' + str(pid))
         args = ['sudo', 'kill', '-SIGINT', str(pid)]    # Send Ctrl+C to slave DHCP client process
         subprocess.call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
         
@@ -368,7 +386,8 @@ class SlaveDhcpClientProcess:
                 time.sleep(0.1)
                 timeout -= 0.1
                 if timeout <= 0:    # We have reached timeout... send a SIGKILL to the slave process to force termination
-                    if log: logger.info('Sending SIGKILL to slave PID ' + str(pid))
+                    if self._logger is not None:
+                        self._logger.info('Sending SIGKILL to slave PID ' + str(pid))
                     args = ['sudo', 'kill', '-SIGKILL', str(pid)]    # Send Ctrl+C to slave DHCP client process
                     subprocess.call(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
                     break
@@ -556,15 +575,15 @@ class DhcpClientLibrary:
         if self._ifname is None:
             raise Exception('NoInterfaceProvided')
         
-        self._slave_dhcp_process = SlaveDhcpClientProcess(self._dhcp_client_daemon_exec_path, self._ifname)
+        self._slave_dhcp_process = SlaveDhcpClientProcess(dhcp_client_daemon_exec_path=self._dhcp_client_daemon_exec_path, ifname=self._ifname, logger=logger)
         self._slave_dhcp_process.start()
         self._new_lease_event.clear()
-        self._dhcp_client_ctrl = RemoteDhcpClientControl(self._ifname)    # Create a RemoteDhcpClientControl object that symbolizes the control on the remote process (over D-Bus)
+        self._dhcp_client_ctrl = RemoteDhcpClientControl(ifname=self._ifname)    # Create a RemoteDhcpClientControl object that symbolizes the control on the remote process (over D-Bus)
         self._dhcp_client_ctrl.notifyNewLease(self._got_new_lease)  # Ask underlying RemoteDhcpClientControl object to call self._new_lease_retrieved() as soon as we get a new lease 
         logger.debug('DHCP client started on ' + self._ifname)
         slave_pid = self._dhcp_client_ctrl.getRemotePid()
         if slave_pid is None:
-            logger.error('Could not get remote process PID')
+            logger.warn('Could not get remote process PID')
             raise('RemoteCommunicationError')
         else:
             logger.debug('Slave has PID ' + str(slave_pid))        
@@ -768,18 +787,7 @@ dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)    # Use Glib's mainloop a
 
 if __name__ == '__main__':
     atexit.register(cleanupAtExit)
-    try:
-        from console_logger import LOGGER as logger
-    except ImportError:
-        import logging
-
-        logger = logging.getLogger('console_logger')
-        logger.setLevel(logging.DEBUG)
-        
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        logger.addHandler(handler)
-
+    
     try:
         input = raw_input
     except NameError:
@@ -800,6 +808,4 @@ if __name__ == '__main__':
     print("Got a lease with IP address " + ip_addr)
     input('Press enter to stop slave')
     client.stop()
-else:
-    from robot.api import logger
 

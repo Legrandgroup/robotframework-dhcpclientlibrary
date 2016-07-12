@@ -145,16 +145,17 @@ two distinct processes:
   Its primary class is DBusControlledDhcpClient
   This code is running in a process that is distinct from RobotFramework, with root access rights.
   It sends/receives DHCP packets directly on a network interface (via the pydhcplib library).
-  It is remotely controlled by D-Bus method invokations.
+  It is remotely controlled by D-Bus method invokations (it publishes a D-Bus service)
   It reports DHCP states by sending D-Bus signals.
   This module is imported by RobotFramework but can also be run stand-alone (in that cas, it
   behaves as a DHCP client)
-* [DhcpClientLibrary.py](DhcpClientLibrary.py): This is the RobotFramework library.
+* [DhcpClientLibrary.py](/rfdhcpclientlib/DhcpClientLibrary.py): This is the RobotFramework library.
   Its primary class is DhcpClientLibrary
   This Python code runs within the RobotFramework process, with the same access rights as
   RobottFramework.
   It will run a child subrocess that will execute `DBusControlledDhcpClient.py` as root (via sudo).
-  It will then interact with this subprocess using D-Bus calls & signals.
+  It will then interact with this subprocess using D-Bus calls & signals (it is a D-Bus client of
+  `DBusControlledDhcpClient.py`)
   It offers a RobotFramework interface to allow the use of higher level RobotFramework keywords.
 
 These 2 processes are communicating via the D-Bus SYSTEM bus, under the object path
